@@ -8,39 +8,40 @@ import {
   isSnakeOnFury,
   countWallsAround,
 } from './utils';
-import { getNextTarget, resetGameData } from './target-selector';
+import { getNextTarget, resetTargetSelector, detectLevelDeadlocks } from './target-selector';
 
-let lastCommand;
+let lastCommand = '';
+let deadlocks = {};
 
-// Bot Example
-export function getNextSnakeMove(board, logger) {
+export function getNextSnakeMove(board = '', logger) {
   if (isGameOver(board)) {
     return '';
   }
 
   if (isSnakeSleep(board)) {
-    resetGameData();
-    return (lastCommand = '');
+    prepareToRound(board);
+    return '';
   }
 
-  const headPosition = getHeadPosition(board);
+  const maskedBoard = Object.assign(board.split(''), deadlocks).join('');
+  const headPosition = getHeadPosition(maskedBoard);
   if (!headPosition) {
     return '';
   }
 
-  const sorround = getSorround(headPosition); // (LEFT, UP, RIGHT, DOWN)
-  const target = getNextTarget(board, logger);
-  const raitings = sorround.map(ratePositions(board, target));
+  const target = getNextTarget(maskedBoard, logger);
+  const sorround = getSorround(headPosition);
+  const raitings = sorround.map(ratePositions(maskedBoard, target));
   const command = getCommandByRaitings(raitings);
 
   logger('Target:' + JSON.stringify(target));
   logger('Raitings:' + JSON.stringify(raitings));
 
-  return isNeedToDropStone(board) ? [COMMANDS.ACT, command].join(',') : command;
-}
+  if (isNeedToDropStone(maskedBoard)) {
+    return `${COMMANDS.ACT}, ${command}`;
+  }
 
-function isNeedToDropStone(board) {
-  return isSnakeOnFury(board);
+  return command;
 }
 
 function getSorround(position) {
@@ -53,8 +54,13 @@ function getSorround(position) {
   ];
 }
 
+function isNeedToDropStone(board) {
+  return isSnakeOnFury(board);
+}
+
 const ratePositions = (board, target) => ({ x, y, command }) => {
   const element = getElementByXY(board, { x, y });
+  const snakeOnFury = isSnakeOnFury(board);
   const snakeSize = getSnakeSize(board);
 
   const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
@@ -69,20 +75,19 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     return -50;
   }
 
+  // SCORE (0..100) BASED ON DISTANCE TO TARGET
+  const distanceScore = Math.floor(100 / (distance + 1));
+
   switch (element) {
     case ELEMENT.NONE:
-      return Math.floor(1 / (distance + 1) * 100) / 100; // SCORE (0..1) BASED ON DISTANCE TO TARGET
     case ELEMENT.APPLE:
-      return 10;
     case ELEMENT.FLYING_PILL:
-      return 10;
     case ELEMENT.GOLD:
-      return 25;
     case ELEMENT.FURY_PILL:
-      return 50;
+      return distanceScore;
     case ELEMENT.STONE:
       if (target.type === 'STONE') {
-        return 30;
+        return distanceScore;
       }
       return -5;
     case ELEMENT.WALL:
@@ -105,4 +110,10 @@ function getCommandByRaitings(raitings) {
   lastCommand = command;
 
   return command;
+}
+
+function prepareToRound(board) {
+  resetTargetSelector();
+  deadlocks = detectLevelDeadlocks(board);
+  lastCommand = '';
 }

@@ -1,5 +1,4 @@
-// TODO: keep moving forward if raitings are equal
-// TODO: eval pseudo walls on round start
+// TODO: if target is on the same line behind - snake keep move forward
 // TODO: penalty paths on repeat - not targets
 
 import { ELEMENT } from './constants';
@@ -91,9 +90,35 @@ function processSnakePath(board, nextTarget = { index: 0 }) {
   }
 }
 
-export function resetGameData() {
+export function resetTargetSelector() {
   penalties = {};
   snakePath = [];
   prevTargetIndex = null;
   turn = 0;
+}
+
+export function detectLevelDeadlocks(board) {
+  const size = getBoardSize(board);
+  const deadlocks = {};
+
+  let isDeadlockAdded;
+  let maskedBoard = [];
+
+  do {
+    isDeadlockAdded = false;
+    maskedBoard = Object.assign(board.split(''), deadlocks);
+
+    for (var i = 0; i < maskedBoard.length; i++) {
+      if (maskedBoard[i] === ELEMENT.WALL) continue;
+      const x = i % size;
+      const y = (i - (i % size)) / size;
+
+      if (countWallsAround(maskedBoard, x, y) > 2) {
+        deadlocks[i] = ELEMENT.WALL;
+        isDeadlockAdded = true;
+      }
+    }
+  } while (isDeadlockAdded);
+
+  return deadlocks;
 }

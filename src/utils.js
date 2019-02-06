@@ -119,8 +119,17 @@ export function getXYByPosition(board, position) {
   const size = getBoardSize(board);
   return {
     x: position % size,
-    y: (position - position % size) / size,
+    y: (position - (position % size)) / size,
   };
+}
+
+export function getElementByXY(board, position) {
+  const size = getBoardSize(board);
+  return board[size * position.y + position.x];
+}
+
+export function isSnakeSleep(board) {
+  return board.indexOf(ELEMENT.HEAD_SLEEP) !== -1;
 }
 
 export function getSnakeSize(board) {
@@ -137,15 +146,6 @@ export function getSnakeSize(board) {
     if (bodyParts.includes(board[i])) size++;
   }
   return size;
-}
-
-export function getElementByXY(board, position) {
-  const size = getBoardSize(board);
-  return board[size * position.y + position.x];
-}
-
-export function isSnakeSleep(board) {
-  return board.indexOf(ELEMENT.HEAD_SLEEP) !== -1;
 }
 
 export function isSnakeOnFury(board) {
