@@ -90,6 +90,16 @@ export function getHeadPosition(board) {
   ]);
 }
 
+export function getTailPosition(board) {
+  return getFirstPositionOf(board, [
+    ELEMENT.TAIL_END_DOWN,
+    ELEMENT.TAIL_END_LEFT,
+    ELEMENT.TAIL_END_RIGHT,
+    ELEMENT.TAIL_END_UP,
+    ELEMENT.TAIL_INACTIVE,
+  ]);
+}
+
 export function getFirstPositionOf(board, elements) {
   for (var i = 0; i < elements.length; i++) {
     var element = elements[i];
@@ -113,7 +123,31 @@ export function getXYByPosition(board, position) {
   };
 }
 
+export function getSnakeSize(board) {
+  const bodyParts = [
+    ELEMENT.BODY_HORIZONTAL,
+    ELEMENT.BODY_VERTICAL,
+    ELEMENT.BODY_LEFT_DOWN,
+    ELEMENT.BODY_LEFT_UP,
+    ELEMENT.BODY_RIGHT_DOWN,
+    ELEMENT.BODY_RIGHT_UP,
+  ];
+  let size = 2; // HEAD & TAIL
+  for (var i = 0; i < board.length; i++) {
+    if (bodyParts.includes(board[i])) size++;
+  }
+  return size;
+}
+
 export function getElementByXY(board, position) {
   const size = getBoardSize(board);
   return board[size * position.y + position.x];
+}
+
+export function isSnakeSleep(board) {
+  return board.indexOf(ELEMENT.HEAD_SLEEP) !== -1;
+}
+
+export function isSnakeOnFury(board) {
+  return board.indexOf(ELEMENT.HEAD_EVIL) !== -1;
 }
