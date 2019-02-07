@@ -7,8 +7,9 @@ import {
   isSnakeSleep,
   isSnakeOnFury,
   countWallsAround,
+  getBoardSize,
 } from './utils';
-import { getNextTarget, resetTargetSelector, detectLevelDeadlocks } from './target-selector';
+import { getNextTarget, processSnakePath, resetTargetSelector, detectLevelDeadlocks } from './target-selector';
 
 let lastCommand = '';
 let deadlocks = {};
@@ -34,6 +35,10 @@ export function getNextSnakeMove(board = '', logger) {
   const raitings = sorround.map(ratePositions(maskedBoard, target));
   const command = getCommandByRaitings(raitings);
 
+  // processors
+  processSnakePath(maskedBoard, target);
+  
+  // loggers
   logger('Target:' + JSON.stringify(target));
   logger('Raitings:' + JSON.stringify(raitings));
 
@@ -60,11 +65,14 @@ function isNeedToDropStone(board) {
 
 const ratePositions = (board, target) => ({ x, y, command }) => {
   const element = getElementByXY(board, { x, y });
-  const snakeOnFury = isSnakeOnFury(board);
+  const boardSize = getBoardSize(board);
+
   const snakeSize = getSnakeSize(board);
+  const snakeOnFury = isSnakeOnFury(board);
 
   const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
-  const distance = target ? Math.abs(target.position.x - x) + Math.abs(target.position.y - y) : 0;
+  const distanceX = target ? Math.abs(target.position.x - x) : 0;
+  const distanceY = target ? Math.abs(target.position.y - y) : 0;
   const wallsAround = countWallsAround(board, x, y);
 
   if (wallsAround > 2) {
@@ -75,8 +83,9 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     return -50;
   }
 
-  // SCORE (0..100) BASED ON DISTANCE TO TARGET
-  const distanceScore = Math.floor(100 / (distance + 1));
+  // SCORE (0..900) BASED ON DISTANCE TO TARGET
+  const distSqr = distanceX * distanceX + distanceY * distanceY;
+  const distanceScore = boardSize * boardSize - distSqr;
 
   switch (element) {
     case ELEMENT.NONE:
@@ -85,14 +94,44 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     case ELEMENT.GOLD:
     case ELEMENT.FURY_PILL:
       return distanceScore;
+
     case ELEMENT.STONE:
       if (target.type === 'STONE') {
         return distanceScore;
       }
       return -5;
+
     case ELEMENT.WALL:
     case ELEMENT.START_FLOOR:
       return -10;
+
+    // OWN BODY
+    case ELEMENT.BODY_HORIZONTAL:
+    case ELEMENT.BODY_VERTICAL:
+    case ELEMENT.BODY_LEFT_DOWN:
+    case ELEMENT.BODY_LEFT_UP:
+    case ELEMENT.BODY_RIGHT_UP:
+      if (snakeOnFury) {
+        return 900;
+      }
+      return -3;
+
+    // ENEMY HEAD OR BODY
+    case ELEMENT.ENEMY_HEAD_DOWN:
+    case ELEMENT.ENEMY_HEAD_LEFT:
+    case ELEMENT.ENEMY_HEAD_RIGHT:
+    case ELEMENT.ENEMY_HEAD_UP:
+    case ELEMENT.ENEMY_BODY_HORIZONTAL:
+    case ELEMENT.ENEMY_BODY_VERTICAL:
+    case ELEMENT.ENEMY_BODY_LEFT_DOWN:
+    case ELEMENT.ENEMY_BODY_LEFT_UP:
+    case ELEMENT.ENEMY_BODY_RIGHT_DOWN:
+    case ELEMENT.ENEMY_BODY_RIGHT_UP:
+      if (snakeOnFury) {
+        return 999;
+      }
+      return -5;
+
     default:
       return -1;
   }
