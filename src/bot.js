@@ -1,18 +1,9 @@
 import { ELEMENT, COMMANDS, OPPOSITE_COMMANDS } from './constants';
-import {
-  isGameOver,
-  getHeadPosition,
-  getElementByXY,
-  getSnakeSize,
-  isSnakeSleep,
-  isSnakeOnFury,
-  countWallsAround,
-  getBoardSize,
-} from './utils';
-import { getNextTarget, processSnakePath, resetTargetSelector, detectLevelDeadlocks } from './target-selector';
+import { detectLevelDeadlocks } from './board';
+import { isGameOver, isSnakeSleep, getHeadPosition, getElementByXY, getBoardSize, countWallsAround } from './utils';
+import { getNextTarget, preprocessTick, resetProcessingVars, countRepeatsInPath, getFuryMovesLeft } from './processing';
 
 let lastCommand = '';
-let deadlocks = {};
 
 export function getNextSnakeMove(board = '', logger) {
   if (isGameOver(board)) {
@@ -20,33 +11,44 @@ export function getNextSnakeMove(board = '', logger) {
   }
 
   if (isSnakeSleep(board)) {
-    prepareToRound(board);
+    onRoundStart(board);
     return '';
   }
 
+  const deadlocks = detectLevelDeadlocks(board);
   const maskedBoard = Object.assign(board.split(''), deadlocks).join('');
   const headPosition = getHeadPosition(maskedBoard);
   if (!headPosition) {
     return '';
   }
 
-  const target = getNextTarget(maskedBoard, logger);
+  // pre-processor
+  preprocessTick(maskedBoard, logger);
+
+  // should be after pre-processor
+  const command = getNextCommand(maskedBoard, headPosition, logger);
+
+  return command;
+}
+
+function getNextCommand(board, headPosition, logger) {
+  const target = getNextTarget(board);
   const sorround = getSorround(headPosition);
-  const raitings = sorround.map(ratePositions(maskedBoard, target));
+  const raitings = sorround.map(ratePositions(board, target));
   const command = getCommandByRaitings(raitings);
 
-  // processors
-  processSnakePath(maskedBoard, target);
-  
-  // loggers
   logger('Target:' + JSON.stringify(target));
   logger('Raitings:' + JSON.stringify(raitings));
 
-  if (isNeedToDropStone(maskedBoard)) {
-    return `${COMMANDS.ACT}, ${command}`;
+  if (isNeedToDropStone()) {
+    return [command, COMMANDS.ACT].join(',');
   }
 
   return command;
+}
+
+function isNeedToDropStone() {
+  return getFuryMovesLeft(); // drop it when we have a fury moves
 }
 
 function getSorround(position) {
@@ -59,21 +61,16 @@ function getSorround(position) {
   ];
 }
 
-function isNeedToDropStone(board) {
-  return isSnakeOnFury(board);
-}
-
 const ratePositions = (board, target) => ({ x, y, command }) => {
   const element = getElementByXY(board, { x, y });
   const boardSize = getBoardSize(board);
 
-  const snakeSize = getSnakeSize(board);
-  const snakeOnFury = isSnakeOnFury(board);
-
-  const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
   const distanceX = target ? Math.abs(target.position.x - x) : 0;
   const distanceY = target ? Math.abs(target.position.y - y) : 0;
+
   const wallsAround = countWallsAround(board, x, y);
+  const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
+  const furyMovesLeft = getFuryMovesLeft();
 
   if (wallsAround > 2) {
     return -100;
@@ -86,6 +83,8 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
   // SCORE (0..900) BASED ON DISTANCE TO TARGET
   const distSqr = distanceX * distanceX + distanceY * distanceY;
   const distanceScore = boardSize * boardSize - distSqr;
+  const pathRepeatCount = countRepeatsInPath(board, x, y);
+  const score = distanceScore / (pathRepeatCount + 1);
 
   switch (element) {
     case ELEMENT.NONE:
@@ -93,11 +92,11 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     case ELEMENT.FLYING_PILL:
     case ELEMENT.GOLD:
     case ELEMENT.FURY_PILL:
-      return distanceScore;
+      return score;
 
     case ELEMENT.STONE:
-      if (target.type === 'STONE') {
-        return distanceScore;
+      if (target.type === 'STONE' || furyMovesLeft) {
+        return score;
       }
       return -5;
 
@@ -111,9 +110,6 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     case ELEMENT.BODY_LEFT_DOWN:
     case ELEMENT.BODY_LEFT_UP:
     case ELEMENT.BODY_RIGHT_UP:
-      if (snakeOnFury) {
-        return 900;
-      }
       return -3;
 
     // ENEMY HEAD OR BODY
@@ -127,7 +123,7 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     case ELEMENT.ENEMY_BODY_LEFT_UP:
     case ELEMENT.ENEMY_BODY_RIGHT_DOWN:
     case ELEMENT.ENEMY_BODY_RIGHT_UP:
-      if (snakeOnFury) {
+      if (furyMovesLeft) {
         return 999;
       }
       return -5;
@@ -151,8 +147,7 @@ function getCommandByRaitings(raitings) {
   return command;
 }
 
-function prepareToRound(board) {
-  resetTargetSelector();
-  deadlocks = detectLevelDeadlocks(board);
+function onRoundStart() {
+  resetProcessingVars();
   lastCommand = '';
 }
