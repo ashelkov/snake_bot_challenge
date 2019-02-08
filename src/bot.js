@@ -10,7 +10,7 @@ import {
   isNeedToDropStone,
 } from './processing';
 
-let lastCommand = '';
+let prevComand = '';
 
 export function getNextSnakeMove(board = '', logger) {
   if (isGameOver(board)) {
@@ -72,7 +72,7 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
   const distanceY = target ? Math.abs(target.position.y - y) : 0;
 
   const wallsAround = countWallsAround(board, x, y);
-  const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
+  const isImpossibleCommand = command === OPPOSITE_COMMANDS[prevComand];
   const furyMovesLeft = getFuryMovesLeft();
 
   if (wallsAround > 2) {
@@ -91,9 +91,23 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
 
   switch (element) {
     case ELEMENT.NONE:
+      return score;
+
     case ELEMENT.APPLE:
-    case ELEMENT.FLYING_PILL:
+      if (['FURY_PILL', 'GOLD'].includes(target.type)) {
+        return 899;
+      }
+      return score;
+
     case ELEMENT.GOLD:
+      if (['FURY_PILL'].includes(target.type)) {
+        return 899;
+      }
+      return score;
+
+    case ELEMENT.FLYING_PILL:
+      return score / 2;
+
     case ELEMENT.FURY_PILL:
       return score;
 
@@ -145,12 +159,12 @@ function getCommandByRaitings(raitings) {
   ];
 
   const { command } = commandRaitings.sort((a, b) => b.raiting - a.raiting)[0];
-  lastCommand = command;
+  prevComand = command;
 
   return command;
 }
 
 function onRoundStart() {
   resetProcessingVars();
-  lastCommand = '';
+  prevComand = '';
 }

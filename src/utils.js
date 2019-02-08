@@ -119,7 +119,7 @@ export function getXYByPosition(board, position) {
   const size = getBoardSize(board);
   return {
     x: position % size,
-    y: (position - position % size) / size,
+    y: (position - (position % size)) / size,
   };
 }
 

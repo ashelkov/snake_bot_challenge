@@ -2,26 +2,27 @@
 // TODO: prevent head-crash with bigger/fury snake
 // TODO: hunt smaller enemies
 
-import { ELEMENT } from './constants';
+import { ELEMENT, ENEMY_HEADS, ENEMY_TAILS, ENEMY_BODY_MATCHES } from './constants';
 import { getHeadPosition, getBoardSize, getSnakeSize, getXYByPosition, isSnakeOnFury } from './utils';
 
+// ROUND VARS
+
 let turn = 0;
+let targetPath = [];
 let prevTarget = {};
-let snakePath = [];
 let furyMovesLeft = 0;
+let enemies = [];
 
 // PREPROCESS TICK
 
 export function preprocessTick(board, logger) {
-  const headIndex = getHeadIndex(board);
-  snakePath.push(headIndex);
-
-  if (headIndex === prevTarget.index) {
-    onTargetEat(prevTarget);
-  }
+  processSnakePaths(board);
+  getEnemiesData(board);
 
   logger('Turn:' + turn++);
-  logger('Path:' + JSON.stringify(snakePath));
+  logger('Path:' + JSON.stringify(targetPath));
+  logger('My size: ' + getSnakeSize(board));
+  logger('Enemy sizes' + JSON.stringify(enemies.map((e) => e.body.length)));
 
   if (isSnakeOnFury(board)) {
     furyMovesLeft--;
@@ -39,7 +40,7 @@ function onTargetEat(target) {
 }
 
 function onTargetChange(nextTarget) {
-  snakePath = [];
+  targetPath = [];
 }
 
 // TARGET SELECTOR
@@ -70,32 +71,24 @@ export function getNextTarget(board) {
     }
 
     if (board[i] === ELEMENT.GOLD) {
-      addTarget('GOLD', 5);
+      addTarget('GOLD', 10);
     }
 
     if (board[i] === ELEMENT.STONE) {
       if (canCatchOnFury) {
-        addTarget('STONE', 20);
-      } else if (snakeSize > 4) {
-        addTarget('STONE', 5);
+        addTarget('STONE', 10);
       }
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
       addTarget('FURY_PILL', 25);
     }
-
-    // if (board[i] === ELEMENT.FLYING_PILL) {
-    //   addTarget('FLYING_PILL', 0);
-    // }
   }
 
   const nextTarget = targets.sort((a, b) => b.score - a.score)[0];
-
   if (nextTarget.index !== prevTarget.index) {
     onTargetChange(nextTarget);
   }
-
   return (prevTarget = nextTarget);
 }
 
@@ -109,23 +102,81 @@ export function getHeadIndex(board) {
 
 export function countRepeatsInPath(board, x, y) {
   const positionIndex = getBoardSize(board) * y + x;
-  for (var i = 0, count = 0; i < snakePath.length; i++) {
-    if (snakePath[i] === positionIndex) count++;
+  for (var i = 0, count = 0; i < targetPath.length; i++) {
+    if (targetPath[i] === positionIndex) count++;
   }
   return count;
 }
 
 export function resetProcessingVars() {
-  snakePath = [];
+  targetPath = [];
   prevTarget = {};
   turn = 0;
   furyMovesLeft = 0;
+  enemies = [];
 }
 
 export function isNeedToDropStone() {
-  return getFuryMovesLeft(); // drop it when we have a fury moves
+  // todo: drop if enemy head near the tail
+  return false;
 }
 
 export function getFuryMovesLeft() {
   return furyMovesLeft;
+}
+
+// PATHS PROCESSING
+
+function processSnakePaths(board) {
+  const headIndex = getHeadIndex(board);
+
+  targetPath.push(headIndex);
+
+  if (headIndex === prevTarget.index) {
+    onTargetEat(prevTarget);
+  }
+}
+
+function getEnemiesData(board) {
+  enemies = [];
+
+  for (var i = 0; i < board.length; i++) {
+    if (ENEMY_HEADS.includes(board[i])) {
+      enemies.push({
+        headIndex: i,
+        headElement: board[i],
+        isOnFury: board[i] === ELEMENT.ENEMY_HEAD_EVIL,
+        isOnFly: board[i] === ELEMENT.ENEMY_HEAD_FLY,
+        body: getEnemyBody(board, i),
+      });
+    }
+  }
+}
+
+function getEnemyBody(board, headIndex) {
+  const boardSize = getBoardSize(board);
+  const snakeBody = [headIndex];
+  let snakeBodyLength;
+
+  do {
+    const elemIndex = snakeBody[snakeBody.length - 1];
+    snakeBodyLength = snakeBody.length;
+
+    const indexUp = elemIndex - boardSize;
+    const indexDown = elemIndex + boardSize;
+    const indexLeft = elemIndex - 1;
+    const indexRight = elemIndex + 1;
+
+    if (ENEMY_BODY_MATCHES.UP.includes(board[indexUp]) && !snakeBody.includes(indexUp)) {
+      snakeBody.push(indexUp);
+    } else if (ENEMY_BODY_MATCHES.DOWN.includes(board[indexDown]) && !snakeBody.includes(indexDown)) {
+      snakeBody.push(indexDown);
+    } else if (ENEMY_BODY_MATCHES.LEFT.includes(board[indexLeft]) && !snakeBody.includes(indexLeft)) {
+      snakeBody.push(indexLeft);
+    } else if (ENEMY_BODY_MATCHES.RIGHT.includes(board[indexRight]) && !snakeBody.includes(indexRight)) {
+      snakeBody.push(indexRight);
+    }
+  } while (snakeBodyLength !== snakeBody.length);
+
+  return snakeBody;
 }
