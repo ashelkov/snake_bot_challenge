@@ -1,7 +1,14 @@
 import { ELEMENT, COMMANDS, OPPOSITE_COMMANDS } from './constants';
 import { detectLevelDeadlocks } from './board';
 import { isGameOver, isSnakeSleep, getHeadPosition, getElementByXY, getBoardSize, countWallsAround } from './utils';
-import { getNextTarget, preprocessTick, resetProcessingVars, countRepeatsInPath, getFuryMovesLeft } from './processing';
+import {
+  getNextTarget,
+  preprocessTick,
+  resetProcessingVars,
+  countRepeatsInPath,
+  getFuryMovesLeft,
+  isNeedToDropStone,
+} from './processing';
 
 let lastCommand = '';
 
@@ -45,10 +52,6 @@ function getNextCommand(board, headPosition, logger) {
   }
 
   return command;
-}
-
-function isNeedToDropStone() {
-  return getFuryMovesLeft(); // drop it when we have a fury moves
 }
 
 function getSorround(position) {

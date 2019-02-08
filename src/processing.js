@@ -25,6 +25,8 @@ export function preprocessTick(board, logger) {
 
   if (isSnakeOnFury(board)) {
     furyMovesLeft--;
+  } else {
+    furyMovesLeft = 0;
   }
 }
 
@@ -118,6 +120,10 @@ export function resetProcessingVars() {
   prevTarget = {};
   turn = 0;
   furyMovesLeft = 0;
+}
+
+export function isNeedToDropStone() {
+  return getFuryMovesLeft(); // drop it when we have a fury moves
 }
 
 export function getFuryMovesLeft() {
