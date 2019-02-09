@@ -1,6 +1,9 @@
 // TODO: add fury target if first on it
+// TODO: hardcode level blockers
+
 // TODO: eat stones to reduce own length
 // TODO: score variety on eat wn body
+// TODO: logic to act: drop stones
 // *TODO: fury pills control zones (traps)
 
 import _ from 'lodash';
@@ -48,7 +51,7 @@ function onTargetChange(nextTarget) {
 
 // TARGET SELECTOR
 
-export function getNextTarget(board) {
+export function getNextTarget(board, logger) {
   const head = getHeadPosition(board);
   const snakeSize = getSnakeSize(board);
   const furyMovesLeft = getFuryMovesLeft();
@@ -58,6 +61,10 @@ export function getNextTarget(board) {
     const position = getXYByPosition(board, i);
     const distance = Math.abs(position.x - head.x) + Math.abs(position.y - head.y);
     const canCatchOnFury = furyMovesLeft && furyMovesLeft >= distance;
+
+    // is closer to on target
+    const enemyDistances = getEnemyDistancesToTarget(position);
+    const isFirstOnTarget = distance < Math.min(...enemyDistances);
 
     const addTarget = (type, value) => {
       targets.push({
@@ -84,8 +91,9 @@ export function getNextTarget(board) {
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      // todo: if only i closer
-      addTarget('FURY_PILL', 20);
+      if (isFirstOnTarget) {
+        addTarget('FURY_PILL', 25);
+      }
     }
 
     if (ENEMY_BODY.includes(board[i])) {
@@ -112,9 +120,11 @@ export function getNextTarget(board) {
   }
 
   const nextTarget = targets.sort((a, b) => b.score - a.score)[0];
+
   if (nextTarget.index !== prevTarget.index) {
     onTargetChange(nextTarget);
   }
+
   return (prevTarget = nextTarget);
 }
 
@@ -145,6 +155,17 @@ export function isNeedToDropStone() {
 
 export function getFuryMovesLeft() {
   return furyMovesLeft;
+}
+
+export function getEnemyDistancesToTarget(board, position) {
+  if (!position) {
+    return [];
+  }
+  const { x, y } = position;
+  return enemies.map((enemy) => {
+    const pos = getXYByPosition(board, enemy.headIndex);
+    return Math.abs(pos.x - x) + Math.abs(pos.y - y);
+  });
 }
 
 // PATHS PROCESSING
@@ -217,10 +238,6 @@ export function getEnemyHeadZone(enemy, board) {
   return twoMovesZone;
 }
 
-export function getDangerZone() {
-  return enemies.filter((enemy) => enemy.dangerous).reduce((dz, enemy) => [...dz, ...enemy.headZone], []);
-}
-
 export function getEnemyBody(board, headIndex) {
   const boardSize = getBoardSize(board);
   const snakeBody = [headIndex];
@@ -247,4 +264,8 @@ export function getEnemyBody(board, headIndex) {
   } while (snakeBodyLength !== snakeBody.length);
 
   return snakeBody;
+}
+
+export function getDangerZone() {
+  return enemies.filter((enemy) => enemy.dangerous).reduce((dz, enemy) => [...dz, ...enemy.headZone], []);
 }

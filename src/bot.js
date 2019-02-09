@@ -40,7 +40,7 @@ export function getNextSnakeMove(board = '', logger) {
 }
 
 function getNextCommand(board, headPosition, logger) {
-  const target = getNextTarget(board);
+  const target = getNextTarget(board, logger);
   const dangerZone = getDangerZone();
 
   const sorround = getSorround(headPosition);
@@ -49,7 +49,6 @@ function getNextCommand(board, headPosition, logger) {
 
   logger('Target:' + JSON.stringify(target));
   logger('Raitings:' + JSON.stringify(raitings));
-  logger('Danger zone' + JSON.stringify(dangerZone));
 
   if (isNeedToDropStone()) {
     return [command, COMMANDS.ACT].join(',');

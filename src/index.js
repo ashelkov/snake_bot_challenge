@@ -42,7 +42,10 @@ socket.addEventListener('message', function(event) {
   var message = event.data;
   var parameters = message.match(pattern);
   var board = parameters[1];
+  const t1 = new Date();
   var answer = processBoard(board);
+  const t2 = new Date();
+  // console.log(`Process board in ${t2 - t1} ms`);
   socket.send(answer);
 });
 
