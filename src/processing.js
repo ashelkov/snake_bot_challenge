@@ -1,8 +1,9 @@
-// TODO: calc snake length (own/enemy)
-// TODO: prevent head-crash with bigger/fury snake
-// TODO: hunt smaller enemies
+// TODO: avoid bigger or fury enemies
+// TODO: eat stones to reduce own length
 
-import { ELEMENT, ENEMY_HEADS, ENEMY_TAILS, ENEMY_BODY_MATCHES } from './constants';
+import _ from 'lodash';
+
+import { ELEMENT, ENEMY_HEADS, EATABLE_ENEMY_HEADS, ENEMY_BODY_MATCHES, ENEMY_BODY } from './constants';
 import { getHeadPosition, getBoardSize, getSnakeSize, getXYByPosition, isSnakeOnFury } from './utils';
 
 // ROUND VARS
@@ -17,7 +18,7 @@ let enemies = [];
 
 export function preprocessTick(board, logger) {
   processSnakePaths(board);
-  getEnemiesData(board);
+  enemies = getEnemiesData(board);
 
   logger('Turn:' + turn++);
   logger('Path:' + JSON.stringify(targetPath));
@@ -76,12 +77,28 @@ export function getNextTarget(board) {
 
     if (board[i] === ELEMENT.STONE) {
       if (canCatchOnFury) {
-        addTarget('STONE', 10);
+        addTarget('STONE', 5);
       }
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
       addTarget('FURY_PILL', 25);
+    }
+
+    if (EATABLE_ENEMY_HEADS.includes(board[i])) {
+      const enemy = getEnemyByHeadIndex(i);
+      const canEatSnake = snakeSize > enemy.size + 2;
+      const oversize = snakeSize - enemy.size + 2;
+
+      if (canEatSnake) {
+        addTarget('ENEMY_HEAD', oversize);
+      }
+    }
+
+    if (ENEMY_BODY.includes(board[i])) {
+      if (canCatchOnFury) {
+        addTarget('ENEMY_BODY', 50);
+      }
     }
   }
 
@@ -100,12 +117,8 @@ export function getHeadIndex(board) {
   return index;
 }
 
-export function countRepeatsInPath(board, x, y) {
-  const positionIndex = getBoardSize(board) * y + x;
-  for (var i = 0, count = 0; i < targetPath.length; i++) {
-    if (targetPath[i] === positionIndex) count++;
-  }
-  return count;
+export function getEnemyByHeadIndex(headIndex) {
+  return _.find(enemies, { headIndex });
 }
 
 export function resetProcessingVars() {
@@ -137,23 +150,38 @@ function processSnakePaths(board) {
   }
 }
 
-function getEnemiesData(board) {
-  enemies = [];
+export function countRepeatsInPath(board, x, y) {
+  const positionIndex = getBoardSize(board) * y + x;
+  for (var i = 0, count = 0; i < targetPath.length; i++) {
+    if (targetPath[i] === positionIndex) count++;
+  }
+  return count;
+}
+
+// GET ENEMIES DATA
+
+export function getEnemiesData(board) {
+  let enemiesData = [];
 
   for (var i = 0; i < board.length; i++) {
     if (ENEMY_HEADS.includes(board[i])) {
-      enemies.push({
+      const body = getEnemyBody(board, i);
+
+      enemiesData.push({
         headIndex: i,
         headElement: board[i],
+        body,
+        size: body.length,
         isOnFury: board[i] === ELEMENT.ENEMY_HEAD_EVIL,
         isOnFly: board[i] === ELEMENT.ENEMY_HEAD_FLY,
-        body: getEnemyBody(board, i),
       });
     }
   }
+
+  return enemiesData;
 }
 
-function getEnemyBody(board, headIndex) {
+export function getEnemyBody(board, headIndex) {
   const boardSize = getBoardSize(board);
   const snakeBody = [headIndex];
   let snakeBodyLength;
