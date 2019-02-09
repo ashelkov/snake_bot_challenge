@@ -8,6 +8,7 @@ import {
   countRepeatsInPath,
   getFuryMovesLeft,
   isNeedToDropStone,
+  getDangerZone,
 } from './processing';
 
 let prevComand = '';
@@ -40,12 +41,15 @@ export function getNextSnakeMove(board = '', logger) {
 
 function getNextCommand(board, headPosition, logger) {
   const target = getNextTarget(board);
+  const dangerZone = getDangerZone();
+
   const sorround = getSorround(headPosition);
-  const raitings = sorround.map(ratePositions(board, target));
+  const raitings = sorround.map(ratePositions(board, target, dangerZone));
   const command = getCommandByRaitings(raitings);
 
   logger('Target:' + JSON.stringify(target));
   logger('Raitings:' + JSON.stringify(raitings));
+  logger('Danger zone' + JSON.stringify(dangerZone));
 
   if (isNeedToDropStone()) {
     return [command, COMMANDS.ACT].join(',');
@@ -64,23 +68,33 @@ function getSorround(position) {
   ];
 }
 
-const ratePositions = (board, target) => ({ x, y, command }) => {
+const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
   const element = getElementByXY(board, { x, y });
   const boardSize = getBoardSize(board);
-
   const distanceX = target ? Math.abs(target.position.x - x) : 0;
   const distanceY = target ? Math.abs(target.position.y - y) : 0;
-
-  const wallsAround = countWallsAround(board, x, y);
-  const isImpossibleCommand = command === OPPOSITE_COMMANDS[prevComand];
+  const distance = distanceX + distanceY;
   const furyMovesLeft = getFuryMovesLeft();
 
-  if (wallsAround > 2) {
-    return -100;
+  const isImpossibleCommand = command === OPPOSITE_COMMANDS[prevComand];
+  if (isImpossibleCommand) {
+    return -99;
   }
 
-  if (isImpossibleCommand) {
+  const wallsAround = countWallsAround(board, x, y);
+  if (wallsAround > 2) {
+    return -99;
+  }
+
+  const elementIndex = y * boardSize + x;
+  const isInDangerZone = dangerZone.includes(elementIndex);
+  if (isInDangerZone) {
     return -50;
+  }
+
+  const isExactTarget = target && distance === 0;
+  if (isExactTarget) {
+    return 999;
   }
 
   // SCORE (0..900) BASED ON DISTANCE TO TARGET
@@ -90,33 +104,6 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
   const score = distanceScore / (pathRepeatCount + 1);
 
   switch (element) {
-    case ELEMENT.NONE:
-      return score;
-
-    case ELEMENT.APPLE:
-      if (['FURY_PILL', 'GOLD'].includes(target.type)) {
-        return 899;
-      }
-      return score;
-
-    case ELEMENT.GOLD:
-      if (['FURY_PILL'].includes(target.type)) {
-        return 899;
-      }
-      return score;
-
-    case ELEMENT.FLYING_PILL:
-      return score / 2;
-
-    case ELEMENT.FURY_PILL:
-      return score;
-
-    case ELEMENT.STONE:
-      if (target.type === 'STONE' || furyMovesLeft) {
-        return score;
-      }
-      return -5;
-
     case ELEMENT.WALL:
     case ELEMENT.START_FLOOR:
       return -10;
@@ -127,7 +114,7 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     case ELEMENT.BODY_LEFT_DOWN:
     case ELEMENT.BODY_LEFT_UP:
     case ELEMENT.BODY_RIGHT_UP:
-      return -3;
+      return -5;
 
     // ENEMY HEAD OR BODY
     case ELEMENT.ENEMY_HEAD_DOWN:
@@ -141,12 +128,19 @@ const ratePositions = (board, target) => ({ x, y, command }) => {
     case ELEMENT.ENEMY_BODY_RIGHT_DOWN:
     case ELEMENT.ENEMY_BODY_RIGHT_UP:
       if (furyMovesLeft) {
-        return 999;
+        return 900;
       }
-      return -5;
+      return -20;
+
+    // STONE
+    case ELEMENT.STONE:
+      if (target.type === 'STONE' || furyMovesLeft) {
+        return score;
+      }
+      return 0;
 
     default:
-      return -1;
+      return score;
   }
 };
 

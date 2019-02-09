@@ -1,9 +1,11 @@
-// TODO: avoid bigger or fury enemies
+// TODO: add fury target if first on it
 // TODO: eat stones to reduce own length
+// TODO: score variety on eat wn body
+// *TODO: fury pills control zones (traps)
 
 import _ from 'lodash';
 
-import { ELEMENT, ENEMY_HEADS, EATABLE_ENEMY_HEADS, ENEMY_BODY_MATCHES, ENEMY_BODY } from './constants';
+import { ELEMENT, ENEMY_HEADS, ENEMY_BODY_MATCHES, ENEMY_BODY } from './constants';
 import { getHeadPosition, getBoardSize, getSnakeSize, getXYByPosition, isSnakeOnFury } from './utils';
 
 // ROUND VARS
@@ -82,22 +84,29 @@ export function getNextTarget(board) {
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      addTarget('FURY_PILL', 25);
-    }
-
-    if (EATABLE_ENEMY_HEADS.includes(board[i])) {
-      const enemy = getEnemyByHeadIndex(i);
-      const canEatSnake = snakeSize > enemy.size + 2;
-      const oversize = snakeSize - enemy.size + 2;
-
-      if (canEatSnake) {
-        addTarget('ENEMY_HEAD', oversize);
-      }
+      // todo: if only i closer
+      addTarget('FURY_PILL', 20);
     }
 
     if (ENEMY_BODY.includes(board[i])) {
       if (canCatchOnFury) {
         addTarget('ENEMY_BODY', 50);
+      }
+    }
+
+    if (ENEMY_HEADS.includes(board[i])) {
+      const enemy = getEnemyByHeadIndex(i);
+      const canEatSnake = snakeSize >= enemy.size + 2;
+      const canKillEnemyNext = canEatSnake && distance === 1;
+      const oversize = snakeSize - enemy.size;
+      const shouldHuntEnemy = enemies.length === 1 && canEatSnake && oversize > 3;
+
+      if (canKillEnemyNext) {
+        addTarget('ENEMY_HEAD', 99);
+      }
+
+      if (shouldHuntEnemy) {
+        addTarget('ENEMY_HEAD', 50);
       }
     }
   }
@@ -161,7 +170,8 @@ export function countRepeatsInPath(board, x, y) {
 // GET ENEMIES DATA
 
 export function getEnemiesData(board) {
-  let enemiesData = [];
+  const enemiesData = [];
+  const snakeSize = getSnakeSize(board);
 
   for (var i = 0; i < board.length; i++) {
     if (ENEMY_HEADS.includes(board[i])) {
@@ -178,7 +188,37 @@ export function getEnemiesData(board) {
     }
   }
 
+  enemiesData.forEach((enemy) => {
+    enemy.headZone = getEnemyHeadZone(enemy, board);
+    enemy.dangerous = enemy.isOnFury || snakeSize - enemy.size < 2;
+  });
+
   return enemiesData;
+}
+
+export function getEnemyHeadZone(enemy, board) {
+  const { headIndex, body } = enemy;
+  const boardSize = getBoardSize(board);
+  const twoMovesZone = [
+    headIndex + 1,
+    headIndex + 2,
+    headIndex - 1,
+    headIndex - 2,
+    headIndex + boardSize,
+    headIndex + boardSize * 2,
+    headIndex - boardSize,
+    headIndex - boardSize * 2,
+    headIndex + boardSize + 1,
+    headIndex + boardSize - 1,
+    headIndex - boardSize + 1,
+    headIndex - boardSize - 1,
+  ].filter((index) => index !== body[1] && index !== body[2]);
+
+  return twoMovesZone;
+}
+
+export function getDangerZone() {
+  return enemies.filter((enemy) => enemy.dangerous).reduce((dz, enemy) => [...dz, ...enemy.headZone], []);
 }
 
 export function getEnemyBody(board, headIndex) {
