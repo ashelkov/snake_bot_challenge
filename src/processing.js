@@ -1,13 +1,3 @@
-// TODO: improve targeting to avoid fury snakes
-// TODO: mask up deadends maked with snakes
-// TODO: improve fury pills strategy (if enemy body near pills)
-
-// TODO: eat stones to reduce own length
-// TODO: score variety on eat wn body
-// TODO: logic to act: drop stones
-
-// WHY? my snake bite self (add logs on bite)
-
 import _ from 'lodash';
 
 import { ELEMENT, ENEMY_HEADS, ENEMY_BODY_MATCHES, ENEMY_BODY } from './constants';
