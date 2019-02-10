@@ -1,6 +1,14 @@
 import { ELEMENT, COMMANDS, OPPOSITE_COMMANDS } from './constants';
-import { detectLevelDeadlocks } from './board';
-import { isGameOver, isSnakeSleep, getHeadPosition, getElementByXY, getBoardSize, countWallsAround } from './utils';
+import { getLevelDeadlocks, getLevelPockets } from './board';
+import {
+  isGameOver,
+  isSnakeSleep,
+  getHeadPosition,
+  getElementByXY,
+  getBoardSize,
+  countWallsAround,
+  getBoardAsString,
+} from './utils';
 import {
   getNextTarget,
   preprocessTick,
@@ -11,10 +19,13 @@ import {
   getDangerZone,
 } from './processing';
 
-let prevComand = '';
+let lastCommand = '';
+let isLevelProcessed = false;
+let pockets = [];
 
 export function getNextSnakeMove(board = '', logger) {
   if (isGameOver(board)) {
+    positionLogger(board, 'GAME OVER!');
     return '';
   }
 
@@ -23,7 +34,12 @@ export function getNextSnakeMove(board = '', logger) {
     return '';
   }
 
-  const deadlocks = detectLevelDeadlocks(board);
+  if (!isLevelProcessed) {
+    onRoundStart(board);
+  }
+
+  // prepare board
+  const deadlocks = getLevelDeadlocks(board);
   const maskedBoard = Object.assign(board.split(''), deadlocks).join('');
   const headPosition = getHeadPosition(maskedBoard);
   if (!headPosition) {
@@ -40,7 +56,7 @@ export function getNextSnakeMove(board = '', logger) {
 }
 
 function getNextCommand(board, headPosition, logger) {
-  const target = getNextTarget(board, logger);
+  const target = getNextTarget(board, pockets, logger);
   const dangerZone = getDangerZone();
 
   const sorround = getSorround(headPosition);
@@ -75,32 +91,39 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
   const distance = distanceX + distanceY;
   const furyMovesLeft = getFuryMovesLeft();
 
-  const isImpossibleCommand = command === OPPOSITE_COMMANDS[prevComand];
+  const isExactTarget = target && distance === 0;
+  if (isExactTarget) {
+    return 999;
+  }
+
+  const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
   if (isImpossibleCommand) {
     return -99;
   }
 
   const wallsAround = countWallsAround(board, x, y);
   if (wallsAround > 2) {
-    return -99;
+    return -49;
   }
 
   const elementIndex = y * boardSize + x;
   const isInDangerZone = dangerZone.includes(elementIndex);
   if (isInDangerZone) {
-    return -50;
+    return 0;
   }
 
-  const isExactTarget = target && distance === 0;
-  if (isExactTarget) {
-    return 999;
-  }
+  // BASE SCORE (0..900) BASED ON DISTANCE TO TARGET
+  // ALSO PENALTY DIVIDERS ARE PRESENT
 
-  // SCORE (0..900) BASED ON DISTANCE TO TARGET
+  // distance score (0..900)
   const distSqr = distanceX * distanceX + distanceY * distanceY;
   const distanceScore = boardSize * boardSize - distSqr;
-  const pathRepeatCount = countRepeatsInPath(board, x, y);
-  const score = distanceScore / (pathRepeatCount + 1);
+  // penalty modifiers (0..1)
+  const pathRepeats = countRepeatsInPath(board, x, y);
+  const pathRepeatPenalty = pathRepeats > 1 ? 1 / pathRepeats : 1;
+  const pocketPenalty = pockets.includes(elementIndex) ? 0.5 : 1;
+  // score
+  const score = distanceScore * pocketPenalty * pathRepeatPenalty;
 
   switch (element) {
     case ELEMENT.WALL:
@@ -113,7 +136,7 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
     case ELEMENT.BODY_LEFT_DOWN:
     case ELEMENT.BODY_LEFT_UP:
     case ELEMENT.BODY_RIGHT_UP:
-      return -5;
+      return 5;
 
     // ENEMY HEAD OR BODY
     case ELEMENT.ENEMY_HEAD_DOWN:
@@ -152,12 +175,21 @@ function getCommandByRaitings(raitings) {
   ];
 
   const { command } = commandRaitings.sort((a, b) => b.raiting - a.raiting)[0];
-  prevComand = command;
+  lastCommand = command;
 
   return command;
 }
 
-function onRoundStart() {
+function onRoundStart(board) {
   resetProcessingVars();
-  prevComand = '';
+  pockets = getLevelPockets(board);
+  lastCommand = '';
+  isLevelProcessed = true;
+}
+
+export function positionLogger(board, message) {
+  console.log('\n');
+  console.log(message, { lastCommand });
+  console.log(getBoardAsString(board));
+  getBoardAsString(board);
 }

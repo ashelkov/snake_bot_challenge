@@ -1,10 +1,12 @@
-// TODO: add fury target if first on it
-// TODO: hardcode level blockers
+// TODO: dont allow targets near fury snakes
 
 // TODO: eat stones to reduce own length
 // TODO: score variety on eat wn body
 // TODO: logic to act: drop stones
-// *TODO: fury pills control zones (traps)
+// TODO: fury pills control zones (traps)
+
+// BUG?: eat own tail with no reasons
+// BUG?: my fury snake avoid enemy head zone
 
 import _ from 'lodash';
 
@@ -51,7 +53,7 @@ function onTargetChange(nextTarget) {
 
 // TARGET SELECTOR
 
-export function getNextTarget(board, logger) {
+export function getNextTarget(board, pockets = []) {
   const head = getHeadPosition(board);
   const snakeSize = getSnakeSize(board);
   const furyMovesLeft = getFuryMovesLeft();
@@ -64,7 +66,9 @@ export function getNextTarget(board, logger) {
 
     // is closer to on target
     const enemyDistances = getEnemyDistancesToTarget(position);
-    const isFirstOnTarget = distance < Math.min(...enemyDistances);
+    const closestEnemyDistance = Math.min(...enemyDistances);
+    const isFirstOnTarget = closestEnemyDistance > distance;
+    const extraDistance = closestEnemyDistance - distance;
 
     const addTarget = (type, value) => {
       targets.push({
@@ -81,24 +85,24 @@ export function getNextTarget(board, logger) {
     }
 
     if (board[i] === ELEMENT.GOLD) {
-      addTarget('GOLD', 10);
+      addTarget('GOLD', 4);
     }
 
     if (board[i] === ELEMENT.STONE) {
       if (canCatchOnFury) {
-        addTarget('STONE', 5);
+        addTarget('STONE', 4);
       }
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      if (isFirstOnTarget) {
-        addTarget('FURY_PILL', 25);
+      if (isFirstOnTarget && extraDistance < 4) {
+        addTarget('FURY_PILL', 20);
       }
     }
 
     if (ENEMY_BODY.includes(board[i])) {
       if (canCatchOnFury) {
-        addTarget('ENEMY_BODY', 50);
+        addTarget('ENEMY_BODY', 20);
       }
     }
 
@@ -119,7 +123,9 @@ export function getNextTarget(board, logger) {
     }
   }
 
-  const nextTarget = targets.sort((a, b) => b.score - a.score)[0];
+  const nextTarget = targets
+    .filter((target) => !pockets.includes(target)) // exclude target in pockets
+    .sort((a, b) => b.score - a.score)[0];
 
   if (nextTarget.index !== prevTarget.index) {
     onTargetChange(nextTarget);
@@ -210,8 +216,9 @@ export function getEnemiesData(board) {
   }
 
   enemiesData.forEach((enemy) => {
+    const canCrushMe = enemy.size >= snakeSize + 2;
     enemy.headZone = getEnemyHeadZone(enemy, board);
-    enemy.dangerous = enemy.isOnFury || snakeSize - enemy.size < 2;
+    enemy.isDangerous = enemy.isOnFury ? (furyMovesLeft ? canCrushMe : true) : furyMovesLeft ? false : canCrushMe;
   });
 
   return enemiesData;
@@ -267,5 +274,9 @@ export function getEnemyBody(board, headIndex) {
 }
 
 export function getDangerZone() {
-  return enemies.filter((enemy) => enemy.dangerous).reduce((dz, enemy) => [...dz, ...enemy.headZone], []);
+  const enemyHeadZones = enemies
+    .filter((enemy) => enemy.dangerous)
+    .reduce((dz, enemy) => [...dz, ...enemy.headZone], []);
+  const enemyTails = enemies.map(({ body }) => _.last(body));
+  return [...enemyHeadZones, ...enemyTails];
 }
