@@ -1,12 +1,9 @@
 // TODO: dont allow targets near fury snakes
+// TODO: bigger danger zone for fury enemies
 
 // TODO: eat stones to reduce own length
 // TODO: score variety on eat wn body
 // TODO: logic to act: drop stones
-// TODO: fury pills control zones (traps)
-
-// BUG?: eat own tail with no reasons
-// BUG?: my fury snake avoid enemy head zone
 
 import _ from 'lodash';
 
@@ -65,7 +62,7 @@ export function getNextTarget(board, pockets = []) {
     const canCatchOnFury = furyMovesLeft && furyMovesLeft >= distance;
 
     // is closer to on target
-    const enemyDistances = getEnemyDistancesToTarget(position);
+    const enemyDistances = getEnemyDistancesToTarget(board, position);
     const closestEnemyDistance = Math.min(...enemyDistances);
     const isFirstOnTarget = closestEnemyDistance > distance;
     const extraDistance = closestEnemyDistance - distance;
@@ -85,24 +82,24 @@ export function getNextTarget(board, pockets = []) {
     }
 
     if (board[i] === ELEMENT.GOLD) {
-      addTarget('GOLD', 4);
+      addTarget('GOLD', 6);
     }
 
     if (board[i] === ELEMENT.STONE) {
       if (canCatchOnFury) {
-        addTarget('STONE', 4);
+        addTarget('STONE', 5);
       }
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      if (isFirstOnTarget && extraDistance < 4) {
+      if (isFirstOnTarget && extraDistance < 6) {
         addTarget('FURY_PILL', 20);
       }
     }
 
     if (ENEMY_BODY.includes(board[i])) {
       if (canCatchOnFury) {
-        addTarget('ENEMY_BODY', 20);
+        addTarget('ENEMY_BODY', 25);
       }
     }
 
@@ -118,7 +115,7 @@ export function getNextTarget(board, pockets = []) {
       }
 
       if (shouldHuntEnemy) {
-        addTarget('ENEMY_HEAD', 50);
+        addTarget('ENEMY_HEAD', 20);
       }
     }
   }

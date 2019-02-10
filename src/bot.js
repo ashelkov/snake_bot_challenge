@@ -17,6 +17,7 @@ import {
   getFuryMovesLeft,
   isNeedToDropStone,
   getDangerZone,
+  getEnemyDistancesToTarget,
 } from './processing';
 
 let lastCommand = '';
@@ -64,6 +65,7 @@ function getNextCommand(board, headPosition, logger) {
   const command = getCommandByRaitings(raitings);
 
   logger('Target:' + JSON.stringify(target));
+  logger('Target distances:' + JSON.stringify(getEnemyDistancesToTarget(board, target.position)));
   logger('Raitings:' + JSON.stringify(raitings));
 
   if (isNeedToDropStone()) {
@@ -92,7 +94,7 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
   const furyMovesLeft = getFuryMovesLeft();
 
   const isExactTarget = target && distance === 0;
-  if (isExactTarget) {
+  if (isExactTarget && ['ENEMY_HEAD', 'ENEMY_BODY', 'FURY_PILL'].includes(target.type)) {
     return 999;
   }
 
@@ -136,7 +138,7 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
     case ELEMENT.BODY_LEFT_DOWN:
     case ELEMENT.BODY_LEFT_UP:
     case ELEMENT.BODY_RIGHT_UP:
-      return 5;
+      return -5;
 
     // ENEMY HEAD OR BODY
     case ELEMENT.ENEMY_HEAD_DOWN:
