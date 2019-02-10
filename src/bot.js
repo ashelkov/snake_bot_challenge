@@ -138,6 +138,7 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
     case ELEMENT.BODY_LEFT_DOWN:
     case ELEMENT.BODY_LEFT_UP:
     case ELEMENT.BODY_RIGHT_UP:
+    case ELEMENT.BODY_RIGHT_DOWN:
       return -5;
 
     // ENEMY HEAD OR BODY

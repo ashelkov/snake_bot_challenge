@@ -1,9 +1,12 @@
-// TODO: dont allow targets near fury snakes
-// TODO: bigger danger zone for fury enemies
+// TODO: improve targeting to avoid fury snakes
+// TODO: mask up deadends maked with snakes
+// TODO: improve fury pills strategy (if enemy body near pills)
 
 // TODO: eat stones to reduce own length
 // TODO: score variety on eat wn body
 // TODO: logic to act: drop stones
+
+// WHY? my snake bite self (add logs on bite)
 
 import _ from 'lodash';
 
@@ -92,7 +95,7 @@ export function getNextTarget(board, pockets = []) {
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      if (isFirstOnTarget && extraDistance < 6) {
+      if (isFirstOnTarget && extraDistance <= 5) {
         addTarget('FURY_PILL', 20);
       }
     }
@@ -121,7 +124,7 @@ export function getNextTarget(board, pockets = []) {
   }
 
   const nextTarget = targets
-    .filter((target) => !pockets.includes(target)) // exclude target in pockets
+    .filter((target) => !pockets.includes(target.index)) // exclude target in pockets
     .sort((a, b) => b.score - a.score)[0];
 
   if (nextTarget.index !== prevTarget.index) {
