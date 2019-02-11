@@ -24,7 +24,7 @@ let lastCommand = '';
 let isLevelProcessed = false;
 let pockets = [];
 
-export function getNextSnakeMove(board = '', logger) {
+export function getNextSnakeMove(board = '', logger, boardViewer) {
   if (isGameOver(board)) {
     positionLogger(board, 'GAME OVER!');
     return '';
@@ -32,6 +32,7 @@ export function getNextSnakeMove(board = '', logger) {
 
   if (isSnakeSleep(board)) {
     onRoundStart(board);
+    boardViewer.reset();
     return '';
   }
 
@@ -51,18 +52,20 @@ export function getNextSnakeMove(board = '', logger) {
   preprocessTick(maskedBoard, logger);
 
   // should be after pre-processor
-  const command = getNextCommand(maskedBoard, headPosition, logger);
+  const command = getNextCommand({ board: maskedBoard, headPosition, logger, boardViewer });
 
   return command;
 }
 
-function getNextCommand(board, headPosition, logger) {
+function getNextCommand({ board, headPosition, logger, boardViewer }) {
   const target = getNextTarget(board, pockets, logger);
   const dangerZone = getDangerZone();
 
   const sorround = getSorround(headPosition);
   const raitings = sorround.map(ratePositions(board, target, dangerZone));
   const command = getCommandByRaitings(raitings);
+
+  boardViewer.setData({ currentTarget: target });
 
   logger('Target:' + JSON.stringify(target));
   logger('Target distances:' + JSON.stringify(getEnemyDistancesToTarget(board, target.position)));

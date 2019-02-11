@@ -21,6 +21,7 @@
  */
 import { getNextSnakeMove } from './bot';
 import { getBoardAsString } from './utils';
+import { BoardViewer } from './board-viewer';
 
 var URL = process.env.GAME_URL || '';
 var url = URL.replace('http', 'ws')
@@ -28,6 +29,7 @@ var url = URL.replace('http', 'ws')
   .replace('?code=', '&code=');
 
 var socket = new WebSocket(url);
+var boardViewer = new BoardViewer('board-viewer');
 
 socket.addEventListener('open', function(event) {
   console.log('Open');
@@ -44,6 +46,7 @@ socket.addEventListener('message', function(event) {
   var board = parameters[1];
   const t1 = new Date();
   var answer = processBoard(board);
+  boardViewer.draw(board);
   const t2 = new Date();
   // console.log(`Process board in ${t2 - t1} ms`);
   socket.send(answer);
@@ -54,7 +57,7 @@ function processBoard(board) {
   function logger(message) {
     programLogs += message + '\n';
   }
-  var answer = getNextSnakeMove(board, logger);
+  var answer = getNextSnakeMove(board, logger, boardViewer);
   var boardString = getBoardAsString(board);
 
   var logMessage = boardString + '\n\n';
@@ -65,8 +68,9 @@ function processBoard(board) {
   logMessage += '-----------------------------------\n';
   logMessage += 'Answer: ' + answer + '\n';
 
-  printBoard(boardString);
-  printLog(logMessage);
+  printProgramLogs(programLogs);
+  // printBoard(boardString);
+  // printLog(logMessage);
   return answer;
 }
 
@@ -92,4 +96,9 @@ function printLog(text) {
   } else {
     textarea.value = text + '\n' + textarea.value;
   }
+}
+
+function printProgramLogs(text) {
+  var textarea = document.getElementById('program-logs');
+  textarea.value = text;
 }

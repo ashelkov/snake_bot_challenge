@@ -20,20 +20,34 @@
   #L%
   -->
 <html>
-	<head>
-		<meta charset="utf8">
-		<title>Snake battle bot</title>
-	</head>
-	<body>
-		<textarea id="board" style="line-height: 8px; vertical-align:top;"></textarea>
+  <head>
+    <meta charset="utf8" />
+    <title>Snake battle bot</title>
+  </head>
+  <body>
+    <div id="board-viewer"></div>
+    <textarea id="program-logs" rows="15" cols="40"></textarea>
+
+    <!-- <textarea id="board" style="line-height: 8px; vertical-align:top;"></textarea>
 		<textarea id="log-area" rows="60" cols="120" style="line-height: 10px;"></textarea>
-    <input type="checkbox" id="add-to-end">Add to end</input>
+    <input type="checkbox" id="add-to-end">Add to end</input> -->
     <style>
       textarea {
-        font-family: Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New, monospace;
+        font-family: Consolas, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono,
+          Courier New, monospace;
         font-size: 14px;
-        line-height: 1 !important;
+      }
+
+      #board-viewer {
+        display: inline-block;
+      }
+
+      #program-logs {
+        vertical-align: top;
+        line-height: 20px;
+        margin-left: 10px;
+        padding: 3px;
       }
     </style>
-	</body>
+  </body>
 </html>
