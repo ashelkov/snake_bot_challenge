@@ -13,9 +13,11 @@ let enemies = [];
 
 // PREPROCESS TICK
 
-export function preprocessTick(board, logger) {
+export function preprocessTick(board, logger, boardViewer) {
   processSnakePaths(board);
   enemies = getEnemiesData(board);
+
+  boardViewer.setData({ enemies });
 
   logger('Turn:' + turn++);
   logger('Path:' + JSON.stringify(targetPath));
@@ -196,6 +198,7 @@ export function getEnemiesData(board) {
 
       enemiesData.push({
         headIndex: i,
+        headPosition: getXYByPosition(board, i),
         headElement: board[i],
         body,
         size: body.length,
@@ -205,10 +208,22 @@ export function getEnemiesData(board) {
     }
   }
 
+  const isEnemyDangerous = (enemy) => {
+    const oversize = snakeSize - enemy.size;
+    if ((furyMovesLeft && enemy.isOnFury) || (!furyMovesLeft && !enemy.isOnFury)) {
+      return oversize < 2;
+    }
+    if (furyMovesLeft) {
+      return false;
+    }
+    if (enemy.isOnFury) {
+      return true;
+    }
+  };
+
   enemiesData.forEach((enemy) => {
-    const canCrushMe = enemy.size >= snakeSize + 2;
     enemy.headZone = getEnemyHeadZone(enemy, board);
-    enemy.isDangerous = enemy.isOnFury ? (furyMovesLeft ? canCrushMe : true) : furyMovesLeft ? false : canCrushMe;
+    enemy.dangerous = isEnemyDangerous(enemy);
   });
 
   return enemiesData;
@@ -263,10 +278,9 @@ export function getEnemyBody(board, headIndex) {
   return snakeBody;
 }
 
-export function getDangerZone() {
+export function getEnemyDangerZones() {
   const enemyHeadZones = enemies
     .filter((enemy) => enemy.dangerous)
-    .reduce((dz, enemy) => [...dz, ...enemy.headZone], []);
-  const enemyTails = enemies.map(({ body }) => _.last(body));
-  return [...enemyHeadZones, ...enemyTails];
+    .reduce((zones, enemy) => [...zones, ...enemy.headZone], []);
+  return enemyHeadZones;
 }

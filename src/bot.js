@@ -16,8 +16,8 @@ import {
   countRepeatsInPath,
   getFuryMovesLeft,
   isNeedToDropStone,
-  getDangerZone,
   getEnemyDistancesToTarget,
+  getEnemyDangerZones,
 } from './processing';
 
 let lastCommand = '';
@@ -43,13 +43,15 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
   // prepare board
   const deadlocks = getLevelDeadlocks(board);
   const maskedBoard = Object.assign(board.split(''), deadlocks).join('');
+  boardViewer.setData({ deadlocks: Object.keys(deadlocks).map(Number) });
+
   const headPosition = getHeadPosition(maskedBoard);
   if (!headPosition) {
     return '';
   }
 
   // pre-processor
-  preprocessTick(maskedBoard, logger);
+  preprocessTick(maskedBoard, logger, boardViewer);
 
   // should be after pre-processor
   const command = getNextCommand({ board: maskedBoard, headPosition, logger, boardViewer });
@@ -58,14 +60,18 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
 }
 
 function getNextCommand({ board, headPosition, logger, boardViewer }) {
-  const target = getNextTarget(board, pockets, logger);
-  const dangerZone = getDangerZone();
+  const target = getNextTarget(board, pockets);
+  const dangerZone = getEnemyDangerZones();
 
   const sorround = getSorround(headPosition);
   const raitings = sorround.map(ratePositions(board, target, dangerZone));
   const command = getCommandByRaitings(raitings);
 
-  boardViewer.setData({ currentTarget: target });
+  boardViewer.setData({
+    currentTarget: target,
+    penalties: dangerZone,
+    command,
+  });
 
   logger('Target:' + JSON.stringify(target));
   logger('Target distances:' + JSON.stringify(getEnemyDistancesToTarget(board, target.position)));

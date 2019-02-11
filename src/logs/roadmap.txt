@@ -5,7 +5,7 @@ TODO: count distance to target using head direction (can be +1-2)
 TODO: make scoring based on distance points 1 score = 1 distance (not 0..900)
 TODO: improve targeting to avoid fury snakes
 TODO: improve fury pills strategy (if enemy body near pills)
-
+BUG: still hunt enemy fury snake 
 
 MEDIUM PRIORITY 
 ===============================================

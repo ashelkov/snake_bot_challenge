@@ -1,5 +1,5 @@
 import { ELEMENT } from './constants';
-import { getHeadPosition, getSnakeSize } from './utils';
+import { getHeadPosition, getSnakeSize, getXYByPosition } from './utils';
 
 const TILE_SIZE = 20;
 
@@ -14,13 +14,20 @@ export class BoardViewer {
 
     this.reset();
 
-    this.draw = this.draw.bind(this);
-    this.drawTile = this.drawTile.bind(this);
-    this.setData = this.setData.bind(this);
-    this.reset = this.reset.bind(this);
-    this.drawAnalyzeLayer = this.drawAnalyzeLayer.bind(this);
-    this.drawTarget = this.drawTarget.bind(this);
-    this.drawTargetVector = this.drawTargetVector.bind(this);
+    [
+      'draw',
+      'drawTile',
+      'setData',
+      'reset',
+      'drawAnalyzeLayer',
+      'drawTarget',
+      'drawTargetVector',
+      'drawSnakeSizes',
+      'maskPositions',
+      'drawDeadlocks',
+      'drawPenalties',
+      'drawCommand',
+    ].forEach((funcName) => (this[funcName] = this[funcName].bind(this)));
   }
 
   setData(patch) {
@@ -33,6 +40,9 @@ export class BoardViewer {
     this.data = {
       enemies: null,
       currentTarget: null,
+      command: null,
+      deadlocks: null,
+      penalties: null,
       command: null,
     };
   }
@@ -51,7 +61,7 @@ export class BoardViewer {
     this.data.headPosition = getHeadPosition(board);
     this.data.snakeSize = getSnakeSize(board);
 
-    this.drawAnalyzeLayer();
+    this.drawAnalyzeLayer(board);
   }
 
   drawTile(tile, x, y) {
@@ -66,10 +76,22 @@ export class BoardViewer {
     };
   }
 
-  drawAnalyzeLayer() {
+  drawAnalyzeLayer(board) {
     if (this.data.currentTarget) {
       this.drawTarget();
       this.drawTargetVector();
+    }
+    if (this.data.enemies) {
+      this.drawSnakeSizes();
+    }
+    if (this.data.deadlocks) {
+      this.drawDeadlocks(board);
+    }
+    if (this.data.penalties) {
+      this.drawPenalties(board);
+    }
+    if (this.data.command) {
+      this.drawCommand();
     }
   }
 
@@ -93,5 +115,62 @@ export class BoardViewer {
     this.ctx.lineTo(position.x * TILE_SIZE + TILE_SIZE / 2, position.y * TILE_SIZE + TILE_SIZE / 2);
     this.ctx.strokeStyle = 'rgba(200, 100, 0, 0.5)';
     this.ctx.stroke();
+  }
+
+  drawSnakeSizes() {
+    const { enemies, headPosition, snakeSize } = this.data;
+    if (headPosition) {
+      this.ctx.font = '12px Arial';
+      this.ctx.fillStyle = 'darkgreen';
+      this.ctx.fillText(snakeSize, headPosition.x * TILE_SIZE + TILE_SIZE * 0.75, headPosition.y * TILE_SIZE);
+    }
+    if (enemies) {
+      enemies.forEach(({ size, headPosition: { x, y } }) => {
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = 'firebrick';
+        this.ctx.fillText(size, x * TILE_SIZE + TILE_SIZE * 0.75, y * TILE_SIZE);
+      });
+    }
+  }
+
+  maskPositions(board, positions, color = 'rgba(255, 0, 0, 0.5)') {
+    this.ctx.fillStyle = color;
+    positions.forEach((pos) => {
+      const { x, y } = getXYByPosition(board, pos);
+      this.ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    });
+  }
+
+  drawDeadlocks(board) {
+    const { deadlocks } = this.data;
+    if (deadlocks) {
+      this.maskPositions(board, deadlocks, 'rgba(255, 0, 0, 0.5)');
+    }
+  }
+
+  drawPenalties(board) {
+    const { penalties } = this.data;
+    if (penalties) {
+      this.maskPositions(board, penalties, 'rgba(200, 150, 0, 0.5)');
+    }
+  }
+
+  drawCommand() {
+    if (!this.data.headPosition) return;
+    const {
+      command,
+      headPosition: { x, y },
+    } = this.data;
+    const position = {
+      UP: { x, y: y - 1 },
+      DOWN: { x, y: y + 1 },
+      LEFT: { x: x - 1, y },
+      RIGHT: { x: x + 1, y },
+    }[command];
+
+    this.ctx.fillStyle = 'rgba(50, 150, 250, 0.75)';
+    this.ctx.beginPath();
+    this.ctx.arc(position.x * TILE_SIZE + TILE_SIZE / 2, position.y * TILE_SIZE + TILE_SIZE / 2, 5, 0, 2 * Math.PI);
+    this.ctx.fill();
   }
 }
