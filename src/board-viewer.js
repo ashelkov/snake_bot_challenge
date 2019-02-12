@@ -25,7 +25,7 @@ export class BoardViewer {
       'drawSnakeSizes',
       'maskPositions',
       'drawDeadlocks',
-      'drawPenalties',
+      'drawPockets',
       'drawCommand',
       'drawEnemyHeadzones',
     ].forEach((funcName) => (this[funcName] = this[funcName].bind(this)));
@@ -43,7 +43,7 @@ export class BoardViewer {
       currentTarget: null,
       command: null,
       deadlocks: null,
-      penalties: null,
+      pockets: null,
       command: null,
       enemyHeadzones: null,
     };
@@ -89,8 +89,8 @@ export class BoardViewer {
     if (this.data.deadlocks) {
       this.drawDeadlocks(board);
     }
-    if (this.data.penalties) {
-      this.drawPenalties(board);
+    if (this.data.pockets) {
+      this.drawPockets(board);
     }
     if (this.data.enemyHeadzones) {
       this.drawEnemyHeadzones(board);
@@ -186,10 +186,10 @@ export class BoardViewer {
     }
   }
 
-  drawPenalties(board) {
-    const { penalties } = this.data;
-    if (penalties) {
-      this.maskPositions(board, penalties, 'rgba(255, 150, 0, 0.4)');
+  drawPockets(board) {
+    const { pockets } = this.data;
+    if (pockets) {
+      this.maskPositions(board, pockets, 'rgba(255, 150, 0, 0.4)');
     }
   }
 

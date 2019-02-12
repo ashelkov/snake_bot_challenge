@@ -45,7 +45,7 @@ function onTargetChange(nextTarget) {
 
 // TARGET SELECTOR
 
-export function getNextTarget(board, pockets = []) {
+export function getNextTarget(board, { deadlocks, pockets }) {
   const head = getHeadPosition(board);
   const snakeSize = getSnakeSize(board);
   const furyMovesLeft = getFuryMovesLeft();
@@ -69,6 +69,9 @@ export function getNextTarget(board, pockets = []) {
         position,
         distance,
         score: value - distance,
+        inDeadlocks: deadlocks.includes(i),
+        inPocket: pockets.includes(i),
+        isValuable: ['FURY_PILL', 'ENEMY_HEAD', 'ENEMY_BODY'].includes(type),
       });
     };
 
@@ -100,12 +103,15 @@ export function getNextTarget(board, pockets = []) {
 
     if (ENEMY_HEADS.includes(board[i])) {
       const enemy = getEnemyByHeadIndex(i);
-      const canEatSnake = snakeSize >= enemy.size + 2;
-      const canKillEnemyNext = canEatSnake && distance === 1;
+      const canEatSnake = !enemy.isOnFury && snakeSize >= enemy.size + 2;
+      const canCatchEnemyNext = canEatSnake && distance === 1;
       const oversize = snakeSize - enemy.size;
-      const shouldHuntEnemy = enemies.length === 1 && canEatSnake && oversize > 3;
+      const shouldHuntEnemy =
+        enemies.length === 1
+          ? canEatSnake && oversize > 3 // if have 1 enemy
+          : canEatSnake && oversize > 3 && enemy.size > 5; // if have more than one
 
-      if (canKillEnemyNext) {
+      if (canCatchEnemyNext) {
         addTarget('ENEMY_HEAD', 99);
       }
 
@@ -116,8 +122,9 @@ export function getNextTarget(board, pockets = []) {
   }
 
   const nextTarget = targets
-    .filter((target) => !pockets.includes(target.index)) // exclude target in pockets
-    .sort((a, b) => b.score - a.score)[0];
+    .filter(({ inDeadlocks }) => !inDeadlocks) // reject deadlocked targets
+    .filter(({ inPocket, isValuable }) => !inPocket || isValuable) // reject not valuable in pockets
+    .sort((a, b) => b.score - a.score)[0]; // get best score
 
   if (nextTarget.index !== prevTarget.index) {
     onTargetChange(nextTarget);

@@ -1,14 +1,6 @@
 import { ELEMENT, COMMANDS, OPPOSITE_COMMANDS } from './constants';
 import { getLevelDeadlocks, getLevelPenalties } from './board';
-import {
-  isGameOver,
-  isSnakeSleep,
-  getHeadPosition,
-  getElementByXY,
-  getBoardSize,
-  countWallsAround,
-  getBoardAsString,
-} from './utils';
+import { isGameOver, isSnakeSleep, getHeadPosition, getElementByXY, getBoardSize, getBoardAsString } from './utils';
 import {
   getNextTarget,
   preprocessTick,
@@ -23,7 +15,7 @@ import {
 let lastCommand = '';
 let isLevelProcessed = false;
 let deadlocks = [];
-let penalties = [];
+let pockets = [];
 
 export function getNextSnakeMove(board = '', logger, boardViewer) {
   if (isGameOver(board)) {
@@ -56,16 +48,16 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
 }
 
 function getNextCommand({ board, headPosition, logger, boardViewer }) {
-  const target = getNextTarget(board, penalties);
-  const enemyHeadzones = getEnemyHeadzones();
+  const target = getNextTarget(board, { deadlocks, pockets });
+  const headzones = getEnemyHeadzones();
 
   const sorround = getSorround(headPosition);
-  const raitings = sorround.map(ratePositions(board, target, enemyHeadzones));
+  const raitings = sorround.map(ratePositions(board, target, headzones));
   const command = getCommandByRaitings(raitings);
 
   boardViewer.setData({
     currentTarget: target,
-    enemyHeadzones: enemyHeadzones,
+    enemyHeadzones: headzones,
     command,
   });
 
@@ -108,11 +100,6 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
     return -99;
   }
 
-  const wallsAround = countWallsAround(board, x, y);
-  if (wallsAround > 2) {
-    return -49;
-  }
-
   const elementIndex = y * boardSize + x;
   const isInDangerZone = enemyHeadzones.includes(elementIndex);
   if (isInDangerZone) {
@@ -128,7 +115,7 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
   // penalty modifiers (0..1)
   const pathRepeats = countRepeatsInPath(board, x, y);
   const pathRepeatPenalty = pathRepeats > 1 ? 1 / pathRepeats : 1;
-  const pocketPenalty = penalties.includes(elementIndex) ? 0.5 : 1;
+  const pocketPenalty = pockets.includes(elementIndex) && !target.inPocket ? 0.5 : 1;
   // score
   const score = distanceScore * pocketPenalty * pathRepeatPenalty;
 
@@ -196,10 +183,10 @@ function onRoundStart(board, boardViewer) {
 
 function processLevel(board, boardViewer) {
   deadlocks = getLevelDeadlocks(board);
-  penalties = getLevelPenalties(board, deadlocks);
+  pockets = getLevelPenalties(board, deadlocks);
 
   boardViewer.reset();
-  boardViewer.setData({ deadlocks, penalties });
+  boardViewer.setData({ deadlocks, pockets });
   isLevelProcessed = true;
 }
 

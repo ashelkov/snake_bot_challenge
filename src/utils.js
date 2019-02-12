@@ -128,12 +128,3 @@ export function getSnakeSize(board) {
   }
   return size;
 }
-
-export function countWallsAround(board, x, y) {
-  let count = 0;
-  [{ x: x + 1, y }, { x, y: y + 1 }, { x: x - 1, y }, { x, y: y - 1 }].forEach((pos) => {
-    const element = getAt(board, pos.x, pos.y);
-    if ([ELEMENT.WALL, ELEMENT.START_FLOOR].includes(element)) count++;
-  });
-  return count;
-}
