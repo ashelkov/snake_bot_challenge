@@ -1,26 +1,31 @@
-import { getBoardSize, countWallsAround } from './utils';
+import { getBoardSize } from './utils';
 import { ELEMENT } from './constants';
 
 // RED ZONES: DEADLOCKS
 
 export function getLevelDeadlocks(board) {
-  const size = getBoardSize(board);
-  const deadlocks = {};
+  const boardSize = getBoardSize(board);
+  const deadlocks = [];
 
   let isDeadlockAdded;
-  let maskedBoard = [];
 
   do {
     isDeadlockAdded = false;
-    maskedBoard = Object.assign(board.split(''), deadlocks);
 
-    for (var i = 0; i < maskedBoard.length; i++) {
-      if (maskedBoard[i] === ELEMENT.WALL) continue;
-      const x = i % size;
-      const y = (i - (i % size)) / size;
+    for (var i = 0; i < board.length; i++) {
+      if (deadlocks.includes(i)) continue;
+      if (board[i] === ELEMENT.WALL || board[i] === ELEMENT.START_FLOOR) continue;
 
-      if (countWallsAround(maskedBoard, x, y) > 2) {
-        deadlocks[i] = ELEMENT.WALL;
+      let count = 0;
+      [i + 1, i - 1, i + boardSize, i - boardSize].forEach((index) => {
+        const e = board[index];
+        if (e === ELEMENT.WALL || e === ELEMENT.START_FLOOR || deadlocks.includes(index)) {
+          count++;
+        }
+      });
+
+      if (count > 2) {
+        deadlocks.push(i);
         isDeadlockAdded = true;
       }
     }
@@ -29,20 +34,40 @@ export function getLevelDeadlocks(board) {
   return deadlocks;
 }
 
-// YELLOW ZONES: POCKETS
+// YELLOW ZONES: PENALTIES
 
-export function getLevelPockets(board) {
-  const isEpamLevel = [61, 241, 262, 311, 322, 421, 552, 564, 601, 781].every(
-    (i) => board[i] === ELEMENT.START_FLOOR || board[i] === ELEMENT.ENEMY_HEAD_SLEEP || board[i] === ELEMENT.HEAD_SLEEP,
-  );
-  if (isEpamLevel) {
-    return [
-      ...[218, 219, 220, 221, 250, 251, 278, 279, 280, 281], // E
-      ...[289, 290, 291, 349, 350, 351, 352, 379, 380, 381, 382], // P
-      ...[520, 521, 579, 580, 581, 609, 610, 611], // A
-      ...[560, 561, 562, 589, 591, 593, 619, 620, 622, 623, 649, 650, 651, 652, 653, 679, 680, 681, 682, 683], // M
-    ];
-  }
+export function getLevelPenalties(board, deadlocks = []) {
+  const boardSize = getBoardSize(board);
+  const penalties = [];
 
-  return [];
+  let isPenaltyAdded;
+
+  do {
+    isPenaltyAdded = false;
+
+    for (var i = 0; i < board.length; i++) {
+      const x = i % boardSize;
+      const y = (i - x) / boardSize;
+
+      if (x < 5 || x > boardSize - 5 || y < 5 || y > boardSize - 5) continue;
+      if (penalties.includes(i)) continue;
+      if (deadlocks.includes(i)) continue;
+      if (board[i] === ELEMENT.WALL || board[i] === ELEMENT.START_FLOOR) continue;
+
+      let count = 0;
+      [i + 1, i - 1, i + boardSize, i - boardSize].forEach((index) => {
+        const e = board[index];
+        if (e === ELEMENT.WALL || e === ELEMENT.START_FLOOR || penalties.includes(index) || deadlocks.includes(index)) {
+          count++;
+        }
+      });
+
+      if (count > 1) {
+        penalties.push(i);
+        isPenaltyAdded = true;
+      }
+    }
+  } while (isPenaltyAdded);
+
+  return penalties;
 }

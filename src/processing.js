@@ -278,7 +278,7 @@ export function getEnemyBody(board, headIndex) {
   return snakeBody;
 }
 
-export function getEnemyDangerZones() {
+export function getEnemyHeadzones() {
   const enemyHeadZones = enemies
     .filter((enemy) => enemy.dangerous)
     .reduce((zones, enemy) => [...zones, ...enemy.headZone], []);

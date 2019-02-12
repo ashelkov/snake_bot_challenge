@@ -1,5 +1,5 @@
 import { ELEMENT, COMMANDS, OPPOSITE_COMMANDS } from './constants';
-import { getLevelDeadlocks, getLevelPockets } from './board';
+import { getLevelDeadlocks, getLevelPenalties } from './board';
 import {
   isGameOver,
   isSnakeSleep,
@@ -17,12 +17,13 @@ import {
   getFuryMovesLeft,
   isNeedToDropStone,
   getEnemyDistancesToTarget,
-  getEnemyDangerZones,
+  getEnemyHeadzones,
 } from './processing';
 
 let lastCommand = '';
 let isLevelProcessed = false;
-let pockets = [];
+let deadlocks = [];
+let penalties = [];
 
 export function getNextSnakeMove(board = '', logger, boardViewer) {
   if (isGameOver(board)) {
@@ -31,45 +32,40 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
   }
 
   if (isSnakeSleep(board)) {
-    onRoundStart(board);
-    boardViewer.reset();
+    onRoundStart(board, boardViewer);
     return '';
   }
 
   if (!isLevelProcessed) {
-    onRoundStart(board);
+    onRoundStart(board, boardViewer);
   }
 
   // prepare board
-  const deadlocks = getLevelDeadlocks(board);
-  const maskedBoard = Object.assign(board.split(''), deadlocks).join('');
-  boardViewer.setData({ deadlocks: Object.keys(deadlocks).map(Number) });
-
-  const headPosition = getHeadPosition(maskedBoard);
+  const headPosition = getHeadPosition(board);
   if (!headPosition) {
     return '';
   }
 
   // pre-processor
-  preprocessTick(maskedBoard, logger, boardViewer);
+  preprocessTick(board, logger, boardViewer);
 
   // should be after pre-processor
-  const command = getNextCommand({ board: maskedBoard, headPosition, logger, boardViewer });
+  const command = getNextCommand({ board: board, headPosition, logger, boardViewer });
 
   return command;
 }
 
 function getNextCommand({ board, headPosition, logger, boardViewer }) {
-  const target = getNextTarget(board, pockets);
-  const dangerZone = getEnemyDangerZones();
+  const target = getNextTarget(board, penalties);
+  const enemyHeadzones = getEnemyHeadzones();
 
   const sorround = getSorround(headPosition);
-  const raitings = sorround.map(ratePositions(board, target, dangerZone));
+  const raitings = sorround.map(ratePositions(board, target, enemyHeadzones));
   const command = getCommandByRaitings(raitings);
 
   boardViewer.setData({
     currentTarget: target,
-    penalties: dangerZone,
+    enemyHeadzones: enemyHeadzones,
     command,
   });
 
@@ -94,7 +90,7 @@ function getSorround(position) {
   ];
 }
 
-const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
+const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => {
   const element = getElementByXY(board, { x, y });
   const boardSize = getBoardSize(board);
   const distanceX = target ? Math.abs(target.position.x - x) : 0;
@@ -118,7 +114,7 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
   }
 
   const elementIndex = y * boardSize + x;
-  const isInDangerZone = dangerZone.includes(elementIndex);
+  const isInDangerZone = enemyHeadzones.includes(elementIndex);
   if (isInDangerZone) {
     return 0;
   }
@@ -132,7 +128,7 @@ const ratePositions = (board, target, dangerZone) => ({ x, y, command }) => {
   // penalty modifiers (0..1)
   const pathRepeats = countRepeatsInPath(board, x, y);
   const pathRepeatPenalty = pathRepeats > 1 ? 1 / pathRepeats : 1;
-  const pocketPenalty = pockets.includes(elementIndex) ? 0.5 : 1;
+  const pocketPenalty = penalties.includes(elementIndex) ? 0.5 : 1;
   // score
   const score = distanceScore * pocketPenalty * pathRepeatPenalty;
 
@@ -192,10 +188,18 @@ function getCommandByRaitings(raitings) {
   return command;
 }
 
-function onRoundStart(board) {
+function onRoundStart(board, boardViewer) {
   resetProcessingVars();
-  pockets = getLevelPockets(board);
-  lastCommand = '';
+  processLevel(board, boardViewer);
+  lastCommand = null;
+}
+
+function processLevel(board, boardViewer) {
+  deadlocks = getLevelDeadlocks(board);
+  penalties = getLevelPenalties(board, deadlocks);
+
+  boardViewer.reset();
+  boardViewer.setData({ deadlocks, penalties });
   isLevelProcessed = true;
 }
 
