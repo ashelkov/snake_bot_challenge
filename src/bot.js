@@ -7,9 +7,12 @@ import {
   resetProcessingVars,
   countRepeatsInPath,
   getFuryMovesLeft,
+  getFlyMovesLeft,
+  getWarnArea,
   isNeedToDropStone,
   getEnemyDistancesToTarget,
   getEnemyHeadzones,
+  countWallsAround,
 } from './processing';
 
 let lastCommand = '';
@@ -48,7 +51,7 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
 }
 
 function getNextCommand({ board, headPosition, logger, boardViewer }) {
-  const target = getNextTarget(board, { deadlocks, pockets });
+  const target = getNextTarget(board, { deadlocks, pockets }, boardViewer, logger);
   const headzones = getEnemyHeadzones();
 
   const sorround = getSorround(headPosition);
@@ -83,16 +86,21 @@ function getSorround(position) {
 }
 
 const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => {
-  const element = getElementByXY(board, { x, y });
   const boardSize = getBoardSize(board);
+  const element = getElementByXY(board, { x, y });
+  const elementIndex = y * boardSize + x;
+
   const distanceX = target ? Math.abs(target.position.x - x) : 0;
   const distanceY = target ? Math.abs(target.position.y - y) : 0;
   const distance = distanceX + distanceY;
+
   const furyMovesLeft = getFuryMovesLeft();
+  const flyMovesLeft = getFlyMovesLeft();
+  const warnArea = getWarnArea();
 
   const isExactTarget = target && distance === 0;
-  if (isExactTarget && ['ENEMY_HEAD', 'ENEMY_BODY', 'FURY_PILL'].includes(target.type)) {
-    return 999;
+  if (isExactTarget && ['ENEMY_HEAD', 'ENEMY_BODY', 'FURY_PILL', 'FLYING_PILL'].includes(target.type)) {
+    return 99;
   }
 
   const isImpossibleCommand = command === OPPOSITE_COMMANDS[lastCommand];
@@ -100,24 +108,32 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
     return -99;
   }
 
-  const elementIndex = y * boardSize + x;
-  const isInDangerZone = enemyHeadzones.includes(elementIndex);
-  if (isInDangerZone) {
-    return 0;
+  const isDeadlocked = deadlocks.includes(elementIndex);
+  if (isDeadlocked) {
+    return -50;
   }
 
   // BASE SCORE (0..900) BASED ON DISTANCE TO TARGET
   // ALSO PENALTY DIVIDERS ARE PRESENT
 
-  // distance score (0..900)
-  const distSqr = distanceX * distanceX + distanceY * distanceY;
-  const distanceScore = boardSize * boardSize - distSqr;
-  // penalty modifiers (0..1)
+  // distance (0..90)
+  const distanceScore = boardSize * 3 - (distanceX + distanceY + Math.max(distanceX, distanceY));
+  // penalties (0..1)
   const pathRepeats = countRepeatsInPath(board, x, y);
   const pathRepeatPenalty = pathRepeats > 1 ? 1 / pathRepeats : 1;
-  const pocketPenalty = pockets.includes(elementIndex) && !target.inPocket ? 0.5 : 1;
+  const pocketPenalty = target.inPocket ? 1 : pockets.includes(elementIndex) ? 0.75 : 1;
+  const dangerZonePenalty = enemyHeadzones.includes(elementIndex) ? 0.5 : 1;
+  const warnAreaPenalty = warnArea.includes(elementIndex) ? 0.5 : 1;
+  const wallsPenalty = countWallsAround(board, target.position); // not working
+  const penalties = pocketPenalty * pathRepeatPenalty * dangerZonePenalty * warnAreaPenalty;
+
   // score
-  const score = distanceScore * pocketPenalty * pathRepeatPenalty;
+  const score = distanceScore * penalties - wallsPenalty;
+
+  // lets ignore any obstacles when we fly
+  if (flyMovesLeft) {
+    return distanceScore;
+  }
 
   switch (element) {
     case ELEMENT.WALL:
@@ -144,8 +160,12 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
     case ELEMENT.ENEMY_BODY_LEFT_UP:
     case ELEMENT.ENEMY_BODY_RIGHT_DOWN:
     case ELEMENT.ENEMY_BODY_RIGHT_UP:
+    case ELEMENT.ENEMY_TAIL_END_DOWN:
+    case ELEMENT.ENEMY_TAIL_END_LEFT:
+    case ELEMENT.ENEMY_TAIL_END_RIGHT:
+    case ELEMENT.ENEMY_TAIL_END_UP:
       if (furyMovesLeft) {
-        return 900;
+        return 90;
       }
       return -20;
 

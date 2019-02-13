@@ -1,23 +1,19 @@
 HIGH PRIORITY 
 ===============================================
-TODO: board viewer + analizer
 TODO: count distance to target using head direction (can be +1-2)
 TODO: make scoring based on distance points 1 score = 1 distance (not 0..900)
 TODO: improve targeting to avoid fury snakes
 TODO: improve fury pills strategy (if enemy body near pills)
-BUG: still hunt enemy fury snake 
 
 MEDIUM PRIORITY 
 ===============================================
-TODO: deadlock 3 walls - penalty 2 wals (if target in penalty - no penalty)
 TODO: with equal score turn closer to center
 TODO: can eat stone if target fury_pill
+TODO: if need to eat own body - select part closer to end
 TODO: 1 wall penalty
-
 
 LOW PRIORITY
 ===============================================
 TODO: mask up deadends maked with snakes
 TODO: eat stones to reduce own length
-TODO: if need to eat own body - select part closer to end
 TODO: logic to act: drop stones

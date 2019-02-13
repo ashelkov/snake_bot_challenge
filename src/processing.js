@@ -1,7 +1,7 @@
 import _ from 'lodash';
 
 import { ELEMENT, ENEMY_HEADS, ENEMY_BODY_MATCHES, ENEMY_BODY } from './constants';
-import { getHeadPosition, getBoardSize, getSnakeSize, getXYByPosition, isSnakeOnFury } from './utils';
+import { getHeadPosition, getBoardSize, getSnakeSize, getXYByPosition, getBoardAsArray } from './utils';
 
 // ROUND VARS
 
@@ -9,7 +9,9 @@ let turn = 0;
 let targetPath = [];
 let prevTarget = {};
 let furyMovesLeft = 0;
+let flyMovesLeft = 0;
 let enemies = [];
+let warnArea = [];
 
 // PREPROCESS TICK
 
@@ -20,14 +22,16 @@ export function preprocessTick(board, logger, boardViewer) {
   boardViewer.setData({ enemies });
 
   logger('Turn:' + turn++);
-  logger('Path:' + JSON.stringify(targetPath));
   logger('My size: ' + getSnakeSize(board));
-  logger('Enemy sizes' + JSON.stringify(enemies.map((e) => e.body.length)));
+  logger('Enemy sizes' + JSON.stringify(enemies.map((e) => e.body.length).sort((a, b) => b - a)));
+  logger('Fury moves:' + furyMovesLeft);
+  logger('Fly moves:' + flyMovesLeft);
 
-  if (isSnakeOnFury(board)) {
+  if (furyMovesLeft > 0) {
     furyMovesLeft--;
-  } else {
-    furyMovesLeft = 0;
+  }
+  if (flyMovesLeft > 0) {
+    flyMovesLeft--;
   }
 }
 
@@ -37,6 +41,9 @@ function onTargetEat(target) {
   if (target.type === 'FURY_PILL') {
     furyMovesLeft += 10;
   }
+  if (target.type === 'FLYING_PILL') {
+    flyMovesLeft += 10;
+  }
 }
 
 function onTargetChange(nextTarget) {
@@ -45,11 +52,14 @@ function onTargetChange(nextTarget) {
 
 // TARGET SELECTOR
 
-export function getNextTarget(board, { deadlocks, pockets }) {
+export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger) {
   const head = getHeadPosition(board);
   const snakeSize = getSnakeSize(board);
+  const enemySizes = enemies.map((e) => e.body.length).sort((a, b) => b - a);
+  const enemyOversize = snakeSize - enemySizes[0];
   const furyMovesLeft = getFuryMovesLeft();
   const targets = [];
+  const furyPills = [];
 
   for (var i = 0; i < board.length; i++) {
     const position = getXYByPosition(board, i);
@@ -84,20 +94,32 @@ export function getNextTarget(board, { deadlocks, pockets }) {
     }
 
     if (board[i] === ELEMENT.STONE) {
-      if (canCatchOnFury) {
+      if (canCatchOnFury || enemyOversize > 6) {
         addTarget('STONE', 5);
       }
+    }
+
+    if (board[i] === ELEMENT.FLYING_PILL) {
+      addTarget('FLYING_PILL', 4);
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
       if (isFirstOnTarget && extraDistance <= 5) {
         addTarget('FURY_PILL', 20);
       }
+      furyPills.push({
+        index: i,
+        position,
+        extraDistance,
+        size: 10 + extraDistance,
+        isFirstOnTarget,
+        inDeadlocks: deadlocks.includes(i),
+      });
     }
 
     if (ENEMY_BODY.includes(board[i])) {
       if (canCatchOnFury) {
-        addTarget('ENEMY_BODY', 25);
+        addTarget('ENEMY_BODY', 30);
       }
     }
 
@@ -106,24 +128,42 @@ export function getNextTarget(board, { deadlocks, pockets }) {
       const canEatSnake = !enemy.isOnFury && snakeSize >= enemy.size + 2;
       const canCatchEnemyNext = canEatSnake && distance === 1;
       const oversize = snakeSize - enemy.size;
-      const shouldHuntEnemy =
-        enemies.length === 1
-          ? canEatSnake && oversize > 3 // if have 1 enemy
-          : canEatSnake && oversize > 3 && enemy.size > 5; // if have more than one
+      const shouldHuntEnemy = canEatSnake && oversize > 3;
 
       if (canCatchEnemyNext) {
         addTarget('ENEMY_HEAD', 99);
       }
 
+      if (canCatchOnFury) {
+        addTarget('ENEMY_HEAD', 50);
+      }
+
       if (shouldHuntEnemy) {
-        addTarget('ENEMY_HEAD', 20);
+        addTarget('ENEMY_HEAD', 7);
       }
     }
   }
 
+  warnArea = [];
+  furyPills
+    .filter((pill) => !pill.isFirstOnTarget && !pill.inDeadlocks)
+    .forEach((pill) => {
+      for (var i = 0; i < board.length; i++) {
+        const pos = getXYByPosition(board, i);
+        const distance = Math.abs(pill.position.x - pos.x) + Math.abs(pill.position.y - pos.y);
+        if (distance <= 9) {
+          warnArea.push(i);
+        }
+      }
+    });
+
+  boardViewer.setData({ warnArea });
+  logger('Fury pills: ' + JSON.stringify(furyPills));
+
   const nextTarget = targets
     .filter(({ inDeadlocks }) => !inDeadlocks) // reject deadlocked targets
     .filter(({ inPocket, isValuable }) => !inPocket || isValuable) // reject not valuable in pockets
+    .filter(({ index }) => !warnArea.includes(index)) // not in warn area
     .sort((a, b) => b.score - a.score)[0]; // get best score
 
   if (nextTarget.index !== prevTarget.index) {
@@ -162,15 +202,23 @@ export function getFuryMovesLeft() {
   return furyMovesLeft;
 }
 
-export function getEnemyDistancesToTarget(board, position) {
-  if (!position) {
-    return [];
-  }
-  const { x, y } = position;
-  return enemies.map((enemy) => {
-    const pos = getXYByPosition(board, enemy.headIndex);
-    return Math.abs(pos.x - x) + Math.abs(pos.y - y);
+export function getFlyMovesLeft() {
+  return flyMovesLeft;
+}
+
+export function getWarnArea() {
+  return warnArea;
+}
+
+export function countWallsAround(board, { x, y }) {
+  const boardArr = getBoardAsArray(board);
+  let wallsCount = 0;
+  [boardArr[x + 1][y], boardArr[x - 1][y], boardArr[x][y + 1], boardArr[x][y - 1]].forEach((element) => {
+    if ([ELEMENT.WALL, ELEMENT.START_FLOOR].includes(element)) {
+      wallsCount++;
+    }
   });
+  return wallsCount;
 }
 
 // PATHS PROCESSING
@@ -290,4 +338,15 @@ export function getEnemyHeadzones() {
     .filter((enemy) => enemy.dangerous)
     .reduce((zones, enemy) => [...zones, ...enemy.headZone], []);
   return enemyHeadZones;
+}
+
+export function getEnemyDistancesToTarget(board, position) {
+  if (!position) {
+    return [];
+  }
+  const { x, y } = position;
+  return enemies.map((enemy) => {
+    const pos = getXYByPosition(board, enemy.headIndex);
+    return Math.abs(pos.x - x) + Math.abs(pos.y - y);
+  });
 }

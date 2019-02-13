@@ -28,6 +28,7 @@ export class BoardViewer {
       'drawPockets',
       'drawCommand',
       'drawEnemyHeadzones',
+      'drawWarnAreas',
     ].forEach((funcName) => (this[funcName] = this[funcName].bind(this)));
   }
 
@@ -91,6 +92,9 @@ export class BoardViewer {
     }
     if (this.data.pockets) {
       this.drawPockets(board);
+    }
+    if (this.data.warnArea) {
+      this.drawWarnAreas(board);
     }
     if (this.data.enemyHeadzones) {
       this.drawEnemyHeadzones(board);
@@ -197,6 +201,13 @@ export class BoardViewer {
     const { enemyHeadzones } = this.data;
     if (enemyHeadzones) {
       this.maskPositions(board, enemyHeadzones, 'rgba(255, 0, 0, 0.25)');
+    }
+  }
+
+  drawWarnAreas(board) {
+    const { warnArea } = this.data;
+    if (warnArea) {
+      this.maskPositions(board, warnArea, 'rgba(255, 100, 0, 0.25)');
     }
   }
 }

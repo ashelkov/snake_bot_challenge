@@ -1,4 +1,4 @@
-import { getEnemiesData } from './processing';
+import { getEnemiesData, countWallsAround } from './processing';
 
 describe('board processing', () => {
   describe('getEnemiesData', () => {
@@ -12,8 +12,22 @@ describe('board processing', () => {
         '******';
 
       const enemies = getEnemiesData(board);
-
       expect(enemies[0].size).toEqual(5);
+    });
+  });
+
+  describe('penalties procesing', () => {
+    it('should return correct walls count', () => {
+      const board =
+        '******' + //
+        '*  ┌ö*' +
+        '* ┌┘ *' +
+        '* ˅  *' +
+        '*    *' +
+        '******';
+
+      const wallsCount = countWallsAround(board, { x: 1, y: 1 });
+      expect(wallsCount).toEqual(2);
     });
   });
 });
