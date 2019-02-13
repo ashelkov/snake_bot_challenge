@@ -12,20 +12,15 @@ let furyMovesLeft = 0;
 let flyMovesLeft = 0;
 let enemies = [];
 let warnArea = [];
+let lastEatenElement = '';
 
 // PREPROCESS TICK
 
-export function preprocessTick(board, logger, boardViewer) {
+export function preprocessTick(board, prevBoard, logger, boardViewer) {
   processSnakePaths(board);
   enemies = getEnemiesData(board);
 
   boardViewer.setData({ enemies });
-
-  logger('Turn:' + turn++);
-  logger('My size: ' + getSnakeSize(board));
-  logger('Enemy sizes' + JSON.stringify(enemies.map((e) => e.body.length).sort((a, b) => b - a)));
-  logger('Fury moves:' + furyMovesLeft);
-  logger('Fly moves:' + flyMovesLeft);
 
   if (furyMovesLeft > 0) {
     furyMovesLeft--;
@@ -33,15 +28,30 @@ export function preprocessTick(board, logger, boardViewer) {
   if (flyMovesLeft > 0) {
     flyMovesLeft--;
   }
+
+  const headIndex = getHeadIndex(board);
+  const eatenElement = prevBoard[headIndex];
+
+  if (eatenElement !== ELEMENT.NONE) {
+    lastEatenElement = eatenElement;
+    onElementEaten(eatenElement);
+  }
+
+  logger('Turn: ' + turn++);
+  logger('My size: ' + getSnakeSize(board));
+  logger('Enemy sizes: ' + JSON.stringify(enemies.map((e) => e.body.length).sort((a, b) => b - a)));
+  logger('Fury moves: ' + furyMovesLeft);
+  logger('Fly moves: ' + flyMovesLeft);
+  logger('Eaten: ' + lastEatenElement);
 }
 
 // TARGET EVENTS
 
-function onTargetEat(target) {
-  if (target.type === 'FURY_PILL') {
+function onElementEaten(elem) {
+  if (elem === ELEMENT.FURY_PILL) {
     furyMovesLeft += 10;
   }
-  if (target.type === 'FLYING_PILL') {
+  if (elem === ELEMENT.FLYING_PILL) {
     flyMovesLeft += 10;
   }
 }
@@ -60,6 +70,7 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
   const furyMovesLeft = getFuryMovesLeft();
   const targets = [];
   const furyPills = [];
+  const furyHeads = [];
 
   for (var i = 0; i < board.length; i++) {
     const position = getXYByPosition(board, i);
@@ -94,17 +105,17 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
     }
 
     if (board[i] === ELEMENT.STONE) {
-      if (canCatchOnFury || enemyOversize > 6) {
+      if (canCatchOnFury || enemyOversize > 6 || (snakeSize > 4 && enemyOversize < -6)) {
         addTarget('STONE', 5);
       }
     }
 
     if (board[i] === ELEMENT.FLYING_PILL) {
-      addTarget('FLYING_PILL', 4);
+      addTarget('FLYING_PILL', 3);
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      if (isFirstOnTarget && extraDistance <= 5) {
+      if (isFirstOnTarget && extraDistance <= 6) {
         addTarget('FURY_PILL', 20);
       }
       furyPills.push({
@@ -139,19 +150,41 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
       }
 
       if (shouldHuntEnemy) {
-        addTarget('ENEMY_HEAD', 7);
+        if (enemies.length === 1) {
+          addTarget('ENEMY_HEAD', 15);
+        } else {
+          addTarget('ENEMY_HEAD', 10);
+        }
+      }
+
+      if (enemy.isOnFury) {
+        furyHeads.push({
+          index: i,
+          position,
+        });
       }
     }
   }
 
   warnArea = [];
+
+  furyHeads.forEach((head) => {
+    for (var i = 0; i < board.length; i++) {
+      const pos = getXYByPosition(board, i);
+      const distance = Math.abs(head.position.x - pos.x) + Math.abs(head.position.y - pos.y);
+      if (distance <= 9) {
+        warnArea.push(i);
+      }
+    }
+  });
+
   furyPills
     .filter((pill) => !pill.isFirstOnTarget && !pill.inDeadlocks)
     .forEach((pill) => {
       for (var i = 0; i < board.length; i++) {
         const pos = getXYByPosition(board, i);
         const distance = Math.abs(pill.position.x - pos.x) + Math.abs(pill.position.y - pos.y);
-        if (distance <= 9) {
+        if (distance <= 10) {
           warnArea.push(i);
         }
       }
@@ -225,12 +258,7 @@ export function countWallsAround(board, { x, y }) {
 
 function processSnakePaths(board) {
   const headIndex = getHeadIndex(board);
-
   targetPath.push(headIndex);
-
-  if (headIndex === prevTarget.index) {
-    onTargetEat(prevTarget);
-  }
 }
 
 export function countRepeatsInPath(board, x, y) {

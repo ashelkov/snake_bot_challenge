@@ -21,6 +21,7 @@ let lastCommand = '';
 let isLevelProcessed = false;
 let deadlocks = [];
 let pockets = [];
+let prevBoard = '';
 
 export function getNextSnakeMove(board = '', logger, boardViewer) {
   if (isGameOver(board)) {
@@ -44,7 +45,9 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
   }
 
   // pre-processor
-  preprocessTick(board, logger, boardViewer);
+  preprocessTick(board, prevBoard, logger, boardViewer);
+
+  // reset zombie room
   if (getTick() === 5) {
     const isZombieRoom = isEnemiesGoRight(board);
     console.log('isZombieRoom:', isZombieRoom);
@@ -55,6 +58,9 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
 
   // should be after pre-processor
   const command = getNextCommand({ board: board, headPosition, logger, boardViewer });
+
+  // set prev board
+  prevBoard = board;
 
   return command;
 }
@@ -122,7 +128,7 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
     return -50;
   }
 
-  // BASE SCORE (0..900) BASED ON DISTANCE TO TARGET
+  // BASE SCORE (0..90) BASED ON DISTANCE TO TARGET
   // ALSO PENALTY DIVIDERS ARE PRESENT
 
   // distance (0..90)
@@ -139,11 +145,6 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
   // score
   const score = distanceScore * penalties - wallsPenalty;
 
-  // lets ignore any obstacles when we fly
-  if (flyMovesLeft) {
-    return distanceScore;
-  }
-
   switch (element) {
     case ELEMENT.WALL:
     case ELEMENT.START_FLOOR:
@@ -156,6 +157,9 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
     case ELEMENT.BODY_LEFT_UP:
     case ELEMENT.BODY_RIGHT_UP:
     case ELEMENT.BODY_RIGHT_DOWN:
+      if (flyMovesLeft) {
+        return distanceScore;
+      }
       return -5;
 
     // ENEMY HEAD OR BODY
@@ -176,10 +180,16 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
       if (furyMovesLeft) {
         return 90;
       }
+      if (flyMovesLeft) {
+        return distanceScore;
+      }
       return -20;
 
     // STONE
     case ELEMENT.STONE:
+      if (flyMovesLeft) {
+        return distanceScore;
+      }
       if (target.type === 'STONE' || furyMovesLeft) {
         return score;
       }
