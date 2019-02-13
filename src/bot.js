@@ -13,6 +13,8 @@ import {
   getEnemyDistancesToTarget,
   getEnemyHeadzones,
   countWallsAround,
+  isEnemiesGoRight,
+  getTick,
 } from './processing';
 
 let lastCommand = '';
@@ -43,6 +45,13 @@ export function getNextSnakeMove(board = '', logger, boardViewer) {
 
   // pre-processor
   preprocessTick(board, logger, boardViewer);
+  if (getTick() === 5) {
+    const isZombieRoom = isEnemiesGoRight(board);
+    console.log('isZombieRoom:', isZombieRoom);
+    if (isZombieRoom) {
+      return 'ACT(0)';
+    }
+  }
 
   // should be after pre-processor
   const command = getNextCommand({ board: board, headPosition, logger, boardViewer });

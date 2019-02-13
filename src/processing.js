@@ -350,3 +350,15 @@ export function getEnemyDistancesToTarget(board, position) {
     return Math.abs(pos.x - x) + Math.abs(pos.y - y);
   });
 }
+
+export function isEnemiesGoRight(board) {
+  return (
+    board.indexOf(ELEMENT.ENEMY_HEAD_DOWN) === -1 &&
+    board.indexOf(ELEMENT.ENEMY_HEAD_UP) === -1 &&
+    board.indexOf(ELEMENT.ENEMY_HEAD_LEFT) === -1
+  );
+}
+
+export function getTick() {
+  return turn;
+}
