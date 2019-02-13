@@ -10,7 +10,7 @@ import {
   getFlyMovesLeft,
   getWarnArea,
   isNeedToDropStone,
-  getEnemyDistancesToTarget,
+  getClosestEnemyToTarget,
   getEnemyHeadzones,
   countWallsAround,
   isEnemiesGoRight,
@@ -79,9 +79,10 @@ function getNextCommand({ board, headPosition, logger, boardViewer }) {
     command,
   });
 
-  logger('Target:' + JSON.stringify(target));
-  logger('Target distances:' + JSON.stringify(getEnemyDistancesToTarget(board, target.position)));
-  logger('Raitings:' + JSON.stringify(raitings));
+  const closestEnemyToTarget = getClosestEnemyToTarget(board, target.position);
+  logger('Target: ' + JSON.stringify(_.pick(target, ['type', 'distance'])));
+  logger('Opponent: ' + JSON.stringify(_.pick(closestEnemyToTarget, ['distance', 'enemy.size'])));
+  logger('Raitings: ' + JSON.stringify(raitings));
 
   if (isNeedToDropStone()) {
     return [command, COMMANDS.ACT].join(',');
@@ -111,6 +112,7 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
 
   const furyMovesLeft = getFuryMovesLeft();
   const flyMovesLeft = getFlyMovesLeft();
+  const canCatchOnFury = furyMovesLeft >= distance;
   const warnArea = getWarnArea();
 
   const isExactTarget = target && distance === 0;
@@ -132,13 +134,13 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
   // ALSO PENALTY DIVIDERS ARE PRESENT
 
   // distance (0..90)
-  const distanceScore = boardSize * 3 - (distanceX + distanceY + Math.max(distanceX, distanceY));
+  const distanceScore = boardSize * 3 - (distanceX + distanceY + Math.max(distanceX, distanceY) / 10);
   // penalties (0..1)
   const pathRepeats = countRepeatsInPath(board, x, y);
   const pathRepeatPenalty = pathRepeats > 1 ? 1 / pathRepeats : 1;
   const pocketPenalty = target.inPocket ? 1 : pockets.includes(elementIndex) ? 0.75 : 1;
   const dangerZonePenalty = enemyHeadzones.includes(elementIndex) ? 0.5 : 1;
-  const warnAreaPenalty = warnArea.includes(elementIndex) ? 0.5 : 1;
+  const warnAreaPenalty = !warnArea.includes(elementIndex) || canCatchOnFury ? 1 : 0;
   const wallsPenalty = countWallsAround(board, target.position); // not working
   const penalties = pocketPenalty * pathRepeatPenalty * dangerZonePenalty * warnAreaPenalty;
 
@@ -149,6 +151,12 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
     case ELEMENT.WALL:
     case ELEMENT.START_FLOOR:
       return -10;
+
+    case ELEMENT.FURY_PILL:
+      if (target.type !== 'FURY_PILL') {
+        return score - 1;
+      }
+      return score;
 
     // OWN BODY
     case ELEMENT.BODY_HORIZONTAL:

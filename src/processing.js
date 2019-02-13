@@ -22,19 +22,19 @@ export function preprocessTick(board, prevBoard, logger, boardViewer) {
 
   boardViewer.setData({ enemies });
 
-  if (furyMovesLeft > 0) {
-    furyMovesLeft--;
-  }
-  if (flyMovesLeft > 0) {
-    flyMovesLeft--;
-  }
-
   const headIndex = getHeadIndex(board);
   const eatenElement = prevBoard[headIndex];
 
   if (eatenElement !== ELEMENT.NONE) {
     lastEatenElement = eatenElement;
     onElementEaten(eatenElement);
+  }
+
+  if (furyMovesLeft > 0) {
+    furyMovesLeft--;
+  }
+  if (flyMovesLeft > 0) {
+    flyMovesLeft--;
   }
 
   logger('Turn: ' + turn++);
@@ -65,6 +65,7 @@ function onTargetChange(nextTarget) {
 export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger) {
   const head = getHeadPosition(board);
   const snakeSize = getSnakeSize(board);
+  const boardSize = getBoardSize(board);
   const enemySizes = enemies.map((e) => e.body.length).sort((a, b) => b - a);
   const enemyOversize = snakeSize - enemySizes[0];
   const furyMovesLeft = getFuryMovesLeft();
@@ -78,21 +79,22 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
     const canCatchOnFury = furyMovesLeft && furyMovesLeft >= distance;
 
     // is closer to on target
-    const enemyDistances = getEnemyDistancesToTarget(board, position);
-    const closestEnemyDistance = Math.min(...enemyDistances);
-    const isFirstOnTarget = closestEnemyDistance > distance;
-    const extraDistance = closestEnemyDistance - distance;
+    const closestEnemy = getClosestEnemyToTarget(board, position) || { distance: 0 };
+    const isFirstOnTarget = closestEnemy.distance > distance;
+    const extraDistance = closestEnemy.distance - distance;
 
-    const addTarget = (type, value) => {
+    const addTarget = (type, value, props) => {
       targets.push({
         index: i,
         type,
         position,
         distance,
         score: value - distance,
+        isFirstOnTarget,
         inDeadlocks: deadlocks.includes(i),
         inPocket: pockets.includes(i),
         isValuable: ['FURY_PILL', 'ENEMY_HEAD', 'ENEMY_BODY'].includes(type),
+        ...props,
       });
     };
 
@@ -111,13 +113,21 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
     }
 
     if (board[i] === ELEMENT.FLYING_PILL) {
-      addTarget('FLYING_PILL', 3);
+      addTarget('FLYING_PILL', 2);
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      if (isFirstOnTarget && extraDistance <= 6) {
-        addTarget('FURY_PILL', 20);
+      if (closestEnemy.size > 15) {
+        if (extraDistance <= 9) {
+          addTarget('FURY_PILL', 25);
+        }
+      } else {
+        if (extraDistance <= 6) {
+          addTarget('FURY_PILL', 20);
+        }
       }
+
+      // need to calc danger zones
       furyPills.push({
         index: i,
         position,
@@ -130,7 +140,7 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
 
     if (ENEMY_BODY.includes(board[i])) {
       if (canCatchOnFury) {
-        addTarget('ENEMY_BODY', 30);
+        addTarget('ENEMY_BODY', 30, { isEnemy: true });
       }
     }
 
@@ -142,22 +152,23 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
       const shouldHuntEnemy = canEatSnake && oversize > 3;
 
       if (canCatchEnemyNext) {
-        addTarget('ENEMY_HEAD', 99);
+        addTarget('ENEMY_HEAD', 99, { isEnemy: true });
       }
 
       if (canCatchOnFury) {
-        addTarget('ENEMY_HEAD', 50);
+        addTarget('ENEMY_HEAD', 50, { isEnemy: true });
       }
 
       if (shouldHuntEnemy) {
         if (enemies.length === 1) {
-          addTarget('ENEMY_HEAD', 15);
+          addTarget('ENEMY_HEAD', 12, { isEnemy: true });
         } else {
-          addTarget('ENEMY_HEAD', 10);
+          addTarget('ENEMY_HEAD', 7, { isEnemy: true });
         }
       }
 
       if (enemy.isOnFury) {
+        // need to calc danger zones
         furyHeads.push({
           index: i,
           position,
@@ -166,8 +177,9 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
     }
   }
 
-  warnArea = [];
+  // CALC DANGER ZONES HERE
 
+  warnArea = [];
   furyHeads.forEach((head) => {
     for (var i = 0; i < board.length; i++) {
       const pos = getXYByPosition(board, i);
@@ -177,7 +189,6 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
       }
     }
   });
-
   furyPills
     .filter((pill) => !pill.isFirstOnTarget && !pill.inDeadlocks)
     .forEach((pill) => {
@@ -191,13 +202,27 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
     });
 
   boardViewer.setData({ warnArea });
-  logger('Fury pills: ' + JSON.stringify(furyPills));
 
-  const nextTarget = targets
+  const filteredTargets = targets
+    .filter(({ isFirstOnTarget, isEnemy }) => isFirstOnTarget || isEnemy)
     .filter(({ inDeadlocks }) => !inDeadlocks) // reject deadlocked targets
     .filter(({ inPocket, isValuable }) => !inPocket || isValuable) // reject not valuable in pockets
-    .filter(({ index }) => !warnArea.includes(index)) // not in warn area
-    .sort((a, b) => b.score - a.score)[0]; // get best score
+    .filter(
+      ({ index, type, isFirstOnTarget }) => !warnArea.includes(index) || (type === 'FURY_PILL' && isFirstOnTarget),
+    ); // not in warn area
+
+  // add board center target (use if no closer argets available)
+  const CENTER = { x: 15, y: 15 };
+  const distanceToCenter = Math.abs(CENTER.x - head.x) + Math.abs(CENTER.y - head.y);
+  filteredTargets.push({
+    type: 'BOARD_CENTER',
+    position: CENTER,
+    index: CENTER.y * boardSize + CENTER.x,
+    distance: distanceToCenter,
+    score: -20 - distanceToCenter,
+  });
+
+  const nextTarget = filteredTargets.sort((a, b) => b.score - a.score)[0]; // get best target
 
   if (nextTarget.index !== prevTarget.index) {
     onTargetChange(nextTarget);
@@ -368,15 +393,20 @@ export function getEnemyHeadzones() {
   return enemyHeadZones;
 }
 
-export function getEnemyDistancesToTarget(board, position) {
+export function getClosestEnemyToTarget(board, position) {
   if (!position) {
     return [];
   }
   const { x, y } = position;
-  return enemies.map((enemy) => {
-    const pos = getXYByPosition(board, enemy.headIndex);
-    return Math.abs(pos.x - x) + Math.abs(pos.y - y);
-  });
+  return enemies
+    .map((enemy) => {
+      const pos = getXYByPosition(board, enemy.headIndex);
+      return {
+        enemy,
+        distance: Math.abs(pos.x - x) + Math.abs(pos.y - y),
+      };
+    })
+    .sort((a, b) => a.distance - b.distance)[0];
 }
 
 export function isEnemiesGoRight(board) {
