@@ -113,17 +113,21 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
     }
 
     if (board[i] === ELEMENT.FLYING_PILL) {
-      addTarget('FLYING_PILL', 2);
+      addTarget('FLYING_PILL', 0);
     }
 
     if (board[i] === ELEMENT.FURY_PILL) {
-      if (closestEnemy.size > 15) {
-        if (extraDistance <= 9) {
-          addTarget('FURY_PILL', 25);
-        }
+      if ((turn < 120 && enemies.length > 1) || turn > 270) {
+        addTarget('FURY_PILL', 5);
       } else {
-        if (extraDistance <= 6) {
-          addTarget('FURY_PILL', 20);
+        if (closestEnemy.size > 15) {
+          if (extraDistance <= 9) {
+            addTarget('FURY_PILL', 25);
+          }
+        } else {
+          if (extraDistance <= 6) {
+            addTarget('FURY_PILL', 20);
+          }
         }
       }
 
@@ -135,6 +139,7 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
         size: 10 + extraDistance,
         isFirstOnTarget,
         inDeadlocks: deadlocks.includes(i),
+        inPocket: pockets.includes(i),
       });
     }
 
@@ -149,7 +154,7 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
       const canEatSnake = !enemy.isOnFury && snakeSize >= enemy.size + 2;
       const canCatchEnemyNext = canEatSnake && distance === 1;
       const oversize = snakeSize - enemy.size;
-      const shouldHuntEnemy = canEatSnake && oversize > 3;
+      const shouldHuntEnemy = canEatSnake && oversize > 2;
 
       if (canCatchEnemyNext) {
         addTarget('ENEMY_HEAD', 99, { isEnemy: true });
@@ -189,17 +194,21 @@ export function getNextTarget(board, { deadlocks, pockets }, boardViewer, logger
       }
     }
   });
-  furyPills
-    .filter((pill) => !pill.isFirstOnTarget && !pill.inDeadlocks)
-    .forEach((pill) => {
-      for (var i = 0; i < board.length; i++) {
-        const pos = getXYByPosition(board, i);
-        const distance = Math.abs(pill.position.x - pos.x) + Math.abs(pill.position.y - pos.y);
-        if (distance <= 10) {
+  furyPills.filter((pill) => !pill.isFirstOnTarget && !pill.inDeadlocks).forEach((pill) => {
+    for (var i = 0; i < board.length; i++) {
+      const pos = getXYByPosition(board, i);
+      const distance = Math.abs(pill.position.x - pos.x) + Math.abs(pill.position.y - pos.y);
+      if (pill.inPocket) {
+        if (distance <= 5) {
+          warnArea.push(i);
+        }
+      } else {
+        if (distance <= 9) {
           warnArea.push(i);
         }
       }
-    });
+    }
+  });
 
   boardViewer.setData({ warnArea });
 
@@ -253,7 +262,7 @@ export function resetProcessingVars() {
 
 export function isNeedToDropStone() {
   // todo: drop if enemy head near the tail
-  return false;
+  return furyMovesLeft;
 }
 
 export function getFuryMovesLeft() {

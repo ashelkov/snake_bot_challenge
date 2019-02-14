@@ -139,8 +139,8 @@ const ratePositions = (board, target, enemyHeadzones) => ({ x, y, command }) => 
   const pathRepeats = countRepeatsInPath(board, x, y);
   const pathRepeatPenalty = pathRepeats > 1 ? 1 / pathRepeats : 1;
   const pocketPenalty = target.inPocket ? 1 : pockets.includes(elementIndex) ? 0.75 : 1;
-  const dangerZonePenalty = enemyHeadzones.includes(elementIndex) ? 0.5 : 1;
-  const warnAreaPenalty = !warnArea.includes(elementIndex) || canCatchOnFury ? 1 : 0;
+  const dangerZonePenalty = target.type !== 'FURY_PILL' && enemyHeadzones.includes(elementIndex) ? 0.5 : 1;
+  const warnAreaPenalty = !warnArea.includes(elementIndex) || canCatchOnFury ? 1 : 0.5;
   const wallsPenalty = countWallsAround(board, target.position); // not working
   const penalties = pocketPenalty * pathRepeatPenalty * dangerZonePenalty * warnAreaPenalty;
 
