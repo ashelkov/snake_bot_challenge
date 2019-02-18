@@ -1,3 +1,6 @@
+# EPAM Bot Challenge
+JavaScript Bot that takes 7th place in finals
+
 # Snake battle
 JavaScript Bot example for UI challenge
 
